@@ -30,18 +30,13 @@ def get_client():
     return AzureOpenAI(
         azure_endpoint=endpoint,
         api_key=api_key,
-        api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-12-01-preview"),
+        api_version="2024-12-01-preview",
     )
 
 
-def _get_model():
-    """Nome do deployment do modelo no Azure (ex: gpt-4o, gpt-4.1-mini)."""
-    return os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
-
-
-def _get_whisper_model():
-    """Nome do deployment do Whisper no Azure para transcrição de áudio."""
-    return os.getenv("AZURE_OPENAI_WHISPER_DEPLOYMENT", "whisper")
+# Deployment names — ajuste aqui se seus deployments tiverem nomes diferentes
+GPT_DEPLOYMENT = "gpt-4o"
+WHISPER_DEPLOYMENT = "whisper"
 
 
 def _get_version_as_is():
@@ -55,7 +50,7 @@ def _get_version_to_be():
 def _chat(client, system_prompt: str, user_prompt: str) -> str:
     """Helper: faz uma chamada chat completion no Azure OpenAI."""
     response = client.chat.completions.create(
-        model=_get_model(),
+        model=GPT_DEPLOYMENT,
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
@@ -81,7 +76,7 @@ async def _transcribe_audio(client, audio_path: str) -> str:
     """Transcreve áudio usando o Whisper deployment do Azure OpenAI."""
     with open(audio_path, "rb") as audio_file:
         transcription = client.audio.transcriptions.create(
-            model=_get_whisper_model(),
+            model=WHISPER_DEPLOYMENT,
             file=audio_file,
             language="pt",
         )
