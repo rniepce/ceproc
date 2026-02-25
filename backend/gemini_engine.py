@@ -35,7 +35,7 @@ def get_client():
 
 
 # Deployment names — ajuste aqui se seus deployments tiverem nomes diferentes
-GPT_DEPLOYMENT = "gpt-4o"
+GPT_DEPLOYMENT = "gpt-5.2-chat"
 WHISPER_DEPLOYMENT = "whisper"
 
 
