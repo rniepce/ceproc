@@ -1,9 +1,12 @@
 """
-Gemini AI Engine — 4 Módulos de Engenharia de Processos CEPROC/TJMG
-====================================================================
+LLM Engine — 4 Módulos de Engenharia de Processos CEPROC/TJMG
+==============================================================
+Usa Azure OpenAI (Microsoft Foundry) para todas as chamadas LLM.
+Para áudio, usa o Whisper do Azure para transcrição e depois GPT para análise.
+
 Módulo 1: Extração e Diagnóstico AS-IS (8 eixos)
 Módulo 2: Conversor BPMN-XML para Bizagi (AS-IS)
-Módulo 3: Consultoria e Redesenho TO-BE (Fase A: Sugestões / Fase B: Novo XML)
+Módulo 3: Consultoria e Redesenho TO-BE (Fase A / Fase B)
 Módulo 4: Geração do POP
 
 REGRA DE OURO: Cada módulo é executado individualmente.
@@ -11,99 +14,90 @@ O usuário aprova antes de avançar ao próximo.
 """
 
 import os
-import json
 import re
 from datetime import datetime
-from google import genai
+from openai import AzureOpenAI
 
 
 def get_client():
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        raise ValueError("GEMINI_API_KEY não configurada. Defina no arquivo .env")
-    return genai.Client(api_key=api_key)
+    endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
+    api_key = os.getenv("AZURE_OPENAI_API_KEY")
+    if not endpoint or not api_key:
+        raise ValueError(
+            "AZURE_OPENAI_ENDPOINT e AZURE_OPENAI_API_KEY não configuradas. "
+            "Defina no arquivo .env"
+        )
+    return AzureOpenAI(
+        azure_endpoint=endpoint,
+        api_key=api_key,
+        api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-12-01-preview"),
+    )
+
+
+def _get_model():
+    """Nome do deployment do modelo no Azure (ex: gpt-4o, gpt-4.1-mini)."""
+    return os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
+
+
+def _get_whisper_model():
+    """Nome do deployment do Whisper no Azure para transcrição de áudio."""
+    return os.getenv("AZURE_OPENAI_WHISPER_DEPLOYMENT", "whisper")
 
 
 def _get_version_as_is():
-    """Versão: Data de hoje invertida + '-01' (Ex: 20260225-01)."""
     return datetime.now().strftime("%Y%m%d") + "-01"
 
 
 def _get_version_to_be():
-    """Versão TO-BE: Data de hoje invertida + '-02'."""
     return datetime.now().strftime("%Y%m%d") + "-02"
+
+
+def _chat(client, system_prompt: str, user_prompt: str) -> str:
+    """Helper: faz uma chamada chat completion no Azure OpenAI."""
+    response = client.chat.completions.create(
+        model=_get_model(),
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        temperature=0.4,
+        max_tokens=16000,
+    )
+    return response.choices[0].message.content
+
+
+SYSTEM_PROMPT = (
+    "Você é um Engenheiro de Processos Sênior do TJMG, especialista em "
+    "BPMN 2.0, Metodologia Lean e Gestão do Conhecimento. Você trabalha no "
+    "CEPROC — Centro de Estudos de Procedimentos do Tribunal de Justiça de "
+    "Minas Gerais."
+)
+
+
+# ═══════════════════════════════════════════════════════════════════
+# TRANSCRIÇÃO DE ÁUDIO (Whisper)
+# ═══════════════════════════════════════════════════════════════════
+async def _transcribe_audio(client, audio_path: str) -> str:
+    """Transcreve áudio usando o Whisper deployment do Azure OpenAI."""
+    with open(audio_path, "rb") as audio_file:
+        transcription = client.audio.transcriptions.create(
+            model=_get_whisper_model(),
+            file=audio_file,
+            language="pt",
+        )
+    return transcription.text
 
 
 # ═══════════════════════════════════════════════════════════════════
 # MÓDULO 1: EXTRAÇÃO E DIAGNÓSTICO AS-IS
 # ═══════════════════════════════════════════════════════════════════
-async def modulo_1_extracao_diagnostico(audio_path: str, filename: str) -> str:
-    """
-    Recebe o áudio da entrevista e gera o Relatório de Descoberta
-    estruturado em 8 eixos.
-    """
-    client = get_client()
-    
-    uploaded_file = client.files.upload(file=audio_path)
-    
-    prompt = """Você é um Engenheiro de Processos Sênior do TJMG, especialista em BPMN 2.0, Metodologia Lean e Gestão do Conhecimento.
-
-Você recebeu a transcrição/áudio de uma entrevista de mapeamento de um setor do TJMG.
-
-AÇÃO: Filtre os dados e gere o "Relatório de Descoberta" estruturado nos 8 eixos abaixo:
-
-## 1. Início do Processo
-Gatilhos (o que dispara o processo), atores envolvidos, insumos necessários e normativos aplicáveis.
-
-## 2. Atividades Principais
-Linha do tempo das atividades, atores responsáveis, sistemas utilizados e documentos gerados/consumidos.
-
-## 3. Custo e Produtividade
-Volume de trabalho (quantidade mensal/diária), tempo médio por atividade/processo e tamanho da equipe.
-
-## 4. Restrições e Limitações
-Gargalos identificados, caminhos de exceção e situações problemáticas.
-
-## 5. Fim do Processo
-Última atividade executada, saídas/produtos finais e cliente final (quem recebe).
-
-## 6. Impacto
-Importância estratégica do processo e riscos da não execução.
-
-## 7. Avaliação
-Indicadores existentes e existência de Procedimentos Operacionais Padrão (POPs).
-
-## 8. Expectativa de Melhoria
-Dores da equipe e sugestões de melhoria relatadas pelos servidores.
-
-REGRA IMPORTANTE: Se faltar alguma informação para qualquer eixo, preencha com: [⚠️ Informação não coletada]
-
-Gere o relatório completo em Markdown, de forma clara e profissional."""
-    
-    response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=[uploaded_file, prompt]
-    )
-    
-    return response.text
-
-
-async def modulo_1_from_text(transcricao: str) -> str:
-    """
-    Recebe texto transcrito colado pelo usuário e gera o Relatório
-    de Descoberta estruturado em 8 eixos (sem áudio).
-    """
-    client = get_client()
-    
-    prompt = f"""Você é um Engenheiro de Processos Sênior do TJMG, especialista em BPMN 2.0, Metodologia Lean e Gestão do Conhecimento.
-
-Você recebeu a transcrição de uma entrevista de mapeamento de um setor do TJMG.
+_MODULO_1_PROMPT = """Com base na transcrição da entrevista de mapeamento abaixo, gere o "Relatório de Descoberta" estruturado nos 8 eixos:
 
 --- TRANSCRIÇÃO DA ENTREVISTA ---
 {transcricao}
 --- FIM DA TRANSCRIÇÃO ---
 
-AÇÃO: Filtre os dados e gere o "Relatório de Descoberta" estruturado nos 8 eixos abaixo:
+AÇÃO: Filtre os dados e gere o relatório nos 8 eixos abaixo:
 
 ## 1. Início do Processo
 Gatilhos (o que dispara o processo), atores envolvidos, insumos necessários e normativos aplicáveis.
@@ -132,29 +126,35 @@ Dores da equipe e sugestões de melhoria relatadas pelos servidores.
 REGRA IMPORTANTE: Se faltar alguma informação para qualquer eixo, preencha com: [⚠️ Informação não coletada]
 
 Gere o relatório completo em Markdown, de forma clara e profissional."""
-    
-    response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=prompt
-    )
-    
-    return response.text
+
+
+async def modulo_1_extracao_diagnostico(audio_path: str, filename: str) -> str:
+    """Recebe o áudio → transcreve com Whisper → gera Relatório de Descoberta."""
+    client = get_client()
+
+    # Passo 1: Transcrever com Whisper
+    transcricao = await _transcribe_audio(client, audio_path)
+
+    # Passo 2: Analisar com GPT
+    prompt = _MODULO_1_PROMPT.format(transcricao=transcricao)
+    return _chat(client, SYSTEM_PROMPT, prompt)
+
+
+async def modulo_1_from_text(transcricao: str) -> str:
+    """Recebe texto transcrito colado pelo usuário → gera Relatório de Descoberta."""
+    client = get_client()
+    prompt = _MODULO_1_PROMPT.format(transcricao=transcricao)
+    return _chat(client, SYSTEM_PROMPT, prompt)
 
 
 # ═══════════════════════════════════════════════════════════════════
 # MÓDULO 2: CONVERSOR BPMN-XML PARA BIZAGI (AS-IS)
 # ═══════════════════════════════════════════════════════════════════
 async def modulo_2_bpmn_as_is(relatorio_descoberta: str) -> str:
-    """
-    Converte o fluxo do Módulo 1 em código-fonte XML válido
-    para o Bizagi Modeler (AS-IS).
-    """
     client = get_client()
     version = _get_version_as_is()
-    
-    prompt = f"""Você é um Engenheiro de Processos Sênior do TJMG, especialista em BPMN 2.0 e Bizagi Modeler.
 
-Com base no Relatório de Descoberta abaixo, converta o fluxo AS-IS em código-fonte XML BPMN 2.0 válido e perfeito (<bpmn:definitions>) para importação no Bizagi Modeler.
+    prompt = f"""Com base no Relatório de Descoberta abaixo, converta o fluxo AS-IS em código-fonte XML BPMN 2.0 válido e perfeito (<bpmn:definitions>) para importação no Bizagi Modeler.
 
 --- RELATÓRIO DE DESCOBERTA (MÓDULO 1) ---
 {relatorio_descoberta}
@@ -180,18 +180,14 @@ REGRAS OBRIGATÓRIAS:
 
 OUTPUT: Gere APENAS o XML válido, sem explicações, sem marcadores de código, sem texto antes ou depois. Comece com <?xml e termine com </bpmn:definitions>."""
 
-    response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=prompt
-    )
-    
-    xml_text = response.text.strip()
-    
+    result = _chat(client, SYSTEM_PROMPT, prompt)
+
     # Remove markdown code fences if present
+    xml_text = result.strip()
     if xml_text.startswith("```"):
         xml_text = re.sub(r'^```(?:xml)?\s*\n?', '', xml_text)
         xml_text = re.sub(r'\n?\s*```$', '', xml_text)
-    
+
     return xml_text
 
 
@@ -199,15 +195,9 @@ OUTPUT: Gere APENAS o XML válido, sem explicações, sem marcadores de código,
 # MÓDULO 3A: CONSULTORIA (Sugestões de Melhoria)
 # ═══════════════════════════════════════════════════════════════════
 async def modulo_3a_consultoria(relatorio_descoberta: str, bpmn_as_is: str) -> str:
-    """
-    Fase A: Aponta gargalos (Lean), sugere inovações e KPIs.
-    O usuário escolherá quais propostas aprovar.
-    """
     client = get_client()
-    
-    prompt = f"""Você é um Engenheiro de Processos Sênior do TJMG, especialista em Metodologia Lean, Inovação no Judiciário e Gestão por Indicadores.
 
-Com base no Relatório de Descoberta e no fluxo BPMN AS-IS abaixo, execute a consultoria de redesenho:
+    prompt = f"""Com base no Relatório de Descoberta e no fluxo BPMN AS-IS abaixo, execute a consultoria de redesenho:
 
 --- RELATÓRIO DE DESCOBERTA ---
 {relatorio_descoberta}
@@ -245,32 +235,21 @@ Sugira 3 KPIs (Indicadores-Chave de Desempenho) alinhados às Metas do CNJ, indi
 Numere cada proposta de melhoria para que o usuário possa selecionar quais aprovar.
 Apresente de forma clara e profissional em Markdown."""
 
-    response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=prompt
-    )
-    
-    return response.text
+    return _chat(client, SYSTEM_PROMPT, prompt)
 
 
 # ═══════════════════════════════════════════════════════════════════
 # MÓDULO 3B: REDESENHO TO-BE (Novo XML)
 # ═══════════════════════════════════════════════════════════════════
 async def modulo_3b_redesenho_to_be(
-    relatorio_descoberta: str, 
-    consultoria: str, 
+    relatorio_descoberta: str,
+    consultoria: str,
     propostas_aprovadas: str
 ) -> str:
-    """
-    Fase B: Gera o NOVO XML BPMN (TO-BE) incorporando as propostas
-    aprovadas pelo usuário.
-    """
     client = get_client()
     version = _get_version_to_be()
-    
-    prompt = f"""Você é um Engenheiro de Processos Sênior do TJMG, especialista em BPMN 2.0 e Bizagi Modeler.
 
-Com base no relatório, na consultoria e nas propostas APROVADAS pelo usuário, gere o NOVO código XML BPMN 2.0 (TO-BE).
+    prompt = f"""Com base no relatório, na consultoria e nas propostas APROVADAS pelo usuário, gere o NOVO código XML BPMN 2.0 (TO-BE).
 
 --- RELATÓRIO DE DESCOBERTA ---
 {relatorio_descoberta}
@@ -300,18 +279,13 @@ REGRAS OBRIGATÓRIAS:
 
 OUTPUT: Gere APENAS o XML válido, sem explicações, sem marcadores de código. Comece com <?xml e termine com </bpmn:definitions>."""
 
-    response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=prompt
-    )
-    
-    xml_text = response.text.strip()
-    
-    # Remove markdown code fences if present
+    result = _chat(client, SYSTEM_PROMPT, prompt)
+
+    xml_text = result.strip()
     if xml_text.startswith("```"):
         xml_text = re.sub(r'^```(?:xml)?\s*\n?', '', xml_text)
         xml_text = re.sub(r'\n?\s*```$', '', xml_text)
-    
+
     return xml_text
 
 
@@ -319,16 +293,10 @@ OUTPUT: Gere APENAS o XML válido, sem explicações, sem marcadores de código.
 # MÓDULO 4: GERAÇÃO DO POP
 # ═══════════════════════════════════════════════════════════════════
 async def modulo_4_pop(bpmn_to_be: str, relatorio_descoberta: str) -> str:
-    """
-    Traduz o XML TO-BE aprovado em um POP (Procedimento Operacional Padrão)
-    didático em Markdown para o servidor.
-    """
     client = get_client()
     version = _get_version_to_be()
-    
-    prompt = f"""Você é um Engenheiro de Processos Sênior do TJMG, especialista em Gestão do Conhecimento e Documentação de Processos.
 
-Traduza o fluxo BPMN TO-BE abaixo em um POP (Procedimento Operacional Padrão) didático em Markdown. NÃO use jargões BPMN — o POP é para o servidor que executa o trabalho no dia a dia.
+    prompt = f"""Traduza o fluxo BPMN TO-BE abaixo em um POP (Procedimento Operacional Padrão) didático em Markdown. NÃO use jargões BPMN — o POP é para o servidor que executa o trabalho no dia a dia.
 
 --- BPMN XML TO-BE ---
 {bpmn_to_be[:5000]}
@@ -379,9 +347,4 @@ Para cada etapa, use o formato:
 
 Gere o POP completo em Markdown, de forma clara, didática e profissional."""
 
-    response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=prompt
-    )
-    
-    return response.text
+    return _chat(client, SYSTEM_PROMPT, prompt)
