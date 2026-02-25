@@ -20,6 +20,7 @@ load_dotenv()
 
 from gemini_engine import (
     modulo_1_extracao_diagnostico,
+    modulo_1_from_text,
     modulo_2_bpmn_as_is,
     modulo_3a_consultoria,
     modulo_3b_redesenho_to_be,
@@ -80,6 +81,28 @@ async def run_modulo_1(file: UploadFile = File(...)):
             os.unlink(tmp_path)
         except:
             pass
+
+    return {"success": True, "relatorio_descoberta": relatorio}
+
+
+# ═══════════════════════════════════════════════════════════════════
+# MÓDULO 1 (Texto): Transcrição colada pelo usuário
+# ═══════════════════════════════════════════════════════════════════
+class Modulo1TextRequest(BaseModel):
+    transcricao: str
+
+@app.post("/api/modulo1-text")
+async def run_modulo_1_text(request: Modulo1TextRequest):
+    """Texto transcrito → Relatório de Descoberta (8 eixos)."""
+    if not request.transcricao.strip():
+        raise HTTPException(400, "Texto da transcrição não pode ser vazio.")
+    try:
+        relatorio = await modulo_1_from_text(request.transcricao)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(500, f"Erro no Módulo 1: {str(e)}")
 
     return {"success": True, "relatorio_descoberta": relatorio}
 

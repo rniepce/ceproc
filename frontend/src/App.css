@@ -833,6 +833,85 @@ body {
   margin-top: var(--space-xs);
 }
 
+/* ── Mode Toggle (Audio / Text) ──────────────────────────────── */
+.mode-toggle {
+  display: flex;
+  gap: 2px;
+  background: var(--gray-100);
+  border-radius: var(--radius-lg);
+  padding: 4px;
+  max-width: 400px;
+}
+
+.mode-toggle__btn {
+  flex: 1;
+  padding: 10px 20px;
+  border-radius: var(--radius-md);
+  font-family: var(--font-family);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: var(--gray-500);
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.mode-toggle__btn:hover {
+  color: var(--gray-700);
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.mode-toggle__btn--active {
+  background: var(--white);
+  color: var(--tjmg-vinho);
+  box-shadow: var(--shadow-sm);
+  font-weight: 600;
+}
+
+/* ── Text Input Area ─────────────────────────────────────────── */
+.text-input-area {
+  width: 100%;
+  max-width: 560px;
+}
+
+.text-input-area__textarea {
+  width: 100%;
+  min-height: 260px;
+  padding: var(--space-lg);
+  border-radius: var(--radius-xl);
+  border: 2px solid var(--gray-300);
+  font-family: var(--font-family);
+  font-size: var(--font-size-sm);
+  color: var(--gray-700);
+  background: var(--white);
+  resize: vertical;
+  transition: all var(--transition-base);
+  line-height: 1.7;
+}
+
+.text-input-area__textarea:focus {
+  outline: none;
+  border-color: var(--tjmg-vinho);
+  box-shadow: var(--shadow-glow);
+}
+
+.text-input-area__textarea::placeholder {
+  color: var(--gray-400);
+}
+
+.text-input-area__footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: var(--space-xs) var(--space-sm);
+}
+
+.text-input-area__count {
+  font-size: var(--font-size-xs);
+  color: var(--gray-400);
+}
+
 /* ── Responsive ──────────────────────────────────────────────── */
 @media (max-width: 768px) {
   .main {

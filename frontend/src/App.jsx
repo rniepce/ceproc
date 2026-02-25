@@ -61,6 +61,29 @@ export default function App() {
         }
     }
 
+    // ── Module 1 (Text): Pasted transcription → Relatório ───────────
+    const handleTextUpload = async (text) => {
+        setView('modulo1')
+        setError('')
+        try {
+            const res = await fetch('/api/modulo1-text', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ transcricao: text })
+            })
+            if (!res.ok) {
+                const err = await res.json()
+                throw new Error(err.detail || 'Erro no Módulo 1')
+            }
+            const json = await res.json()
+            updateSession({ relatorio_descoberta: json.relatorio_descoberta })
+            setView('review1')
+        } catch (e) {
+            setError(e.message)
+            setView('error')
+        }
+    }
+
     // ── Module 2: Relatório → BPMN AS-IS ───────────────────────────
     const handleModulo2 = async () => {
         setView('modulo2')
@@ -205,7 +228,7 @@ export default function App() {
             <Header />
             <main className="main">
                 {view === 'upload' && (
-                    <UploadPage onProcess={handleUpload} />
+                    <UploadPage onProcess={handleUpload} onProcessText={handleTextUpload} />
                 )}
 
                 {isProcessing && (

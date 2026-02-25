@@ -88,6 +88,59 @@ Gere o relatório completo em Markdown, de forma clara e profissional."""
     return response.text
 
 
+async def modulo_1_from_text(transcricao: str) -> str:
+    """
+    Recebe texto transcrito colado pelo usuário e gera o Relatório
+    de Descoberta estruturado em 8 eixos (sem áudio).
+    """
+    client = get_client()
+    
+    prompt = f"""Você é um Engenheiro de Processos Sênior do TJMG, especialista em BPMN 2.0, Metodologia Lean e Gestão do Conhecimento.
+
+Você recebeu a transcrição de uma entrevista de mapeamento de um setor do TJMG.
+
+--- TRANSCRIÇÃO DA ENTREVISTA ---
+{transcricao}
+--- FIM DA TRANSCRIÇÃO ---
+
+AÇÃO: Filtre os dados e gere o "Relatório de Descoberta" estruturado nos 8 eixos abaixo:
+
+## 1. Início do Processo
+Gatilhos (o que dispara o processo), atores envolvidos, insumos necessários e normativos aplicáveis.
+
+## 2. Atividades Principais
+Linha do tempo das atividades, atores responsáveis, sistemas utilizados e documentos gerados/consumidos.
+
+## 3. Custo e Produtividade
+Volume de trabalho (quantidade mensal/diária), tempo médio por atividade/processo e tamanho da equipe.
+
+## 4. Restrições e Limitações
+Gargalos identificados, caminhos de exceção e situações problemáticas.
+
+## 5. Fim do Processo
+Última atividade executada, saídas/produtos finais e cliente final (quem recebe).
+
+## 6. Impacto
+Importância estratégica do processo e riscos da não execução.
+
+## 7. Avaliação
+Indicadores existentes e existência de Procedimentos Operacionais Padrão (POPs).
+
+## 8. Expectativa de Melhoria
+Dores da equipe e sugestões de melhoria relatadas pelos servidores.
+
+REGRA IMPORTANTE: Se faltar alguma informação para qualquer eixo, preencha com: [⚠️ Informação não coletada]
+
+Gere o relatório completo em Markdown, de forma clara e profissional."""
+    
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=prompt
+    )
+    
+    return response.text
+
+
 # ═══════════════════════════════════════════════════════════════════
 # MÓDULO 2: CONVERSOR BPMN-XML PARA BIZAGI (AS-IS)
 # ═══════════════════════════════════════════════════════════════════
