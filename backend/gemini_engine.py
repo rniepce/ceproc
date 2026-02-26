@@ -156,45 +156,135 @@ async def modulo_1_from_text(transcricao: str) -> str:
 
 
 # ═══════════════════════════════════════════════════════════════════
-# MÓDULO 2: CONVERSOR BPMN-XML PARA BIZAGI (AS-IS)
+# MÓDULO 2: CONVERSOR BPMN-XML PARA BIZAGI (AS-IS) — CHAIN-OF-THOUGHT
 # ═══════════════════════════════════════════════════════════════════
-async def modulo_2_bpmn_as_is(relatorio_descoberta: str) -> str:
-    client = get_client()
-    version = _get_version_as_is()
 
-    prompt = f"""Com base no Relatório de Descoberta abaixo, converta o fluxo AS-IS em código-fonte XML BPMN 2.0 válido e perfeito (<bpmn:definitions>) para importação no Bizagi Modeler.
+_STEP1_STRUCTURE_PROMPT = """Com base no Relatório de Descoberta abaixo, extraia a ESTRUTURA do processo AS-IS em formato JSON.
 
---- RELATÓRIO DE DESCOBERTA (MÓDULO 1) ---
-{relatorio_descoberta}
---- FIM DO RELATÓRIO ---
+--- RELATÓRIO DE DESCOBERTA ---
+{relatorio}
+--- FIM ---
+
+Retorne APENAS um JSON válido (sem marcadores de código, sem explicações) com esta estrutura:
+
+{{
+  "process_name": "Nome do processo",
+  "documentation": "O modelo de processo atual (As Is) descreve ...",
+  "lanes": [
+    {{
+      "id": "lane_1",
+      "name": "Nome do Ator/Setor"
+    }}
+  ],
+  "elements": [
+    {{
+      "id": "start_1",
+      "type": "startEvent",
+      "name": "Início",
+      "lane": "lane_1"
+    }},
+    {{
+      "id": "task_1",
+      "type": "task",
+      "name": "Verbo no Infinitivo + Complemento",
+      "lane": "lane_1"
+    }},
+    {{
+      "id": "gw_1",
+      "type": "exclusiveGateway",
+      "name": "Pergunta de decisão?",
+      "lane": "lane_1"
+    }},
+    {{
+      "id": "end_1",
+      "type": "endEvent",
+      "name": "Fim",
+      "lane": "lane_1"
+    }}
+  ],
+  "flows": [
+    {{
+      "id": "flow_1",
+      "from": "start_1",
+      "to": "task_1",
+      "label": ""
+    }},
+    {{
+      "id": "flow_2",
+      "from": "gw_1",
+      "to": "task_2",
+      "label": "Sim"
+    }}
+  ]
+}}
+
+REGRAS:
+1. Crie pelo menos 1 lane para cada ator/setor identificado
+2. Use "startEvent" para início, "endEvent" para fim, "task" para atividades, "exclusiveGateway" para decisões
+3. Tarefas: verbos no infinitivo (ex: "Receber petição", "Analisar documento")
+4. Gateways: formulados como perguntas (ex: "Documento está correto?")
+5. Os flows devem conectar TODOS os elementos em sequência lógica
+6. Cada gateway deve ter pelo menos 2 saídas (Sim/Não ou equivalente)
+7. IDs devem ser únicos e sem espaços (use underscore)
+8. Retorne APENAS o JSON, nada mais"""
+
+
+_STEP2_XML_PROMPT = """Converta o JSON abaixo em código XML BPMN 2.0 válido.
+
+--- ESTRUTURA JSON ---
+{structure_json}
+--- FIM ---
 
 REGRAS OBRIGATÓRIAS:
-1. **Versão**: Use "{version}" como ID da versão.
-2. **Documentação** (<bpmn:documentation>): Inicie com "O modelo de processo atual (As Is) descreve ".
-3. **Nomenclatura BPMN**:
-   - Tarefas: Verbos no Infinitivo (ex: "Receber petição", "Analisar documento").
-   - Gateways: Formulados como perguntas (ex: "Documento está correto?").
-4. **Estrutura obrigatória**:
-   - 1 Pool principal (com o nome do processo).
-   - Swimlanes (raias) para cada ator/setor identificado.
-   - Setas (sequenceFlow com sourceRef/targetRef) rigorosamente conectadas.
-   - StartEvent, EndEvent, Tasks, ExclusiveGateways conforme o fluxo.
-5. **Namespaces**: 
+1. **Versão**: Use "{version}" como ID.
+2. **Estrutura XML**:
+   - <bpmn:definitions> como raiz com namespaces corretos
+   - <bpmn:collaboration> com <bpmn:participant> referenciando o processo
+   - <bpmn:process> com <bpmn:laneSet> contendo as lanes
+   - Cada lane com <bpmn:flowNodeRef> listando seus elementos
+   - Todos os elementos (startEvent, task, exclusiveGateway, endEvent)
+   - Todos os sequenceFlow com sourceRef e targetRef corretos
+3. **Namespaces obrigatórios**:
    - xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
    - xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
    - xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
    - xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
-6. **Inclua o BPMNDiagram** com coordenadas (x, y) para cada shape e edge.
+4. **NÃO inclua** <bpmndi:BPMNDiagram> — o layout será calculado automaticamente.
 
-OUTPUT: Gere APENAS o XML válido, sem explicações, sem marcadores de código, sem texto antes ou depois. Comece com <?xml e termine com </bpmn:definitions>."""
+OUTPUT: Gere APENAS o XML válido. Comece com <?xml e termine com </bpmn:definitions>."""
 
-    result = _chat(client, SYSTEM_PROMPT, prompt)
 
-    # Remove markdown code fences if present
-    xml_text = result.strip()
+async def modulo_2_bpmn_as_is(relatorio_descoberta: str) -> str:
+    """Chain-of-thought: extrai estrutura → gera XML → auto-layout."""
+    client = get_client()
+    version = _get_version_as_is()
+
+    # Passo 1: Extrair estrutura como JSON
+    prompt_1 = _STEP1_STRUCTURE_PROMPT.format(relatorio=relatorio_descoberta)
+    structure_json = _chat(client, SYSTEM_PROMPT, prompt_1)
+    
+    # Limpar JSON de possíveis marcadores de código
+    structure_json = structure_json.strip()
+    if structure_json.startswith("```"):
+        structure_json = re.sub(r'^```(?:json)?\s*\n?', '', structure_json)
+        structure_json = re.sub(r'\n?\s*```$', '', structure_json)
+
+    # Passo 2: Gerar XML BPMN a partir do JSON
+    prompt_2 = _STEP2_XML_PROMPT.format(
+        structure_json=structure_json,
+        version=version
+    )
+    xml_result = _chat(client, SYSTEM_PROMPT, prompt_2)
+    
+    # Limpar XML de possíveis marcadores de código
+    xml_text = xml_result.strip()
     if xml_text.startswith("```"):
         xml_text = re.sub(r'^```(?:xml)?\s*\n?', '', xml_text)
         xml_text = re.sub(r'\n?\s*```$', '', xml_text)
+
+    # Passo 3: Auto-layout com Python (coordenadas calculadas)
+    from bpmn_generator import auto_layout_bpmn
+    xml_text = auto_layout_bpmn(xml_text)
 
     return xml_text
 
@@ -247,52 +337,86 @@ Apresente de forma clara e profissional em Markdown."""
 
 
 # ═══════════════════════════════════════════════════════════════════
-# MÓDULO 3B: REDESENHO TO-BE (Novo XML)
+# MÓDULO 3B: REDESENHO TO-BE (Chain-of-Thought)
 # ═══════════════════════════════════════════════════════════════════
-async def modulo_3b_redesenho_to_be(
-    relatorio_descoberta: str,
-    consultoria: str,
-    propostas_aprovadas: str
-) -> str:
-    client = get_client()
-    version = _get_version_to_be()
 
-    prompt = f"""Com base no relatório, na consultoria e nas propostas APROVADAS pelo usuário, gere o NOVO código XML BPMN 2.0 (TO-BE).
+_STEP1_TOBE_PROMPT = """Com base no relatório, consultoria e propostas APROVADAS, extraia a ESTRUTURA do processo TO-BE (otimizado) em formato JSON.
 
 --- RELATÓRIO DE DESCOBERTA ---
-{relatorio_descoberta}
+{relatorio}
 --- FIM ---
 
 --- CONSULTORIA E SUGESTÕES ---
 {consultoria}
 --- FIM ---
 
---- PROPOSTAS APROVADAS PELO USUÁRIO ---
-{propostas_aprovadas}
+--- PROPOSTAS APROVADAS ---
+{propostas}
 --- FIM ---
 
-REGRAS OBRIGATÓRIAS:
-1. **Versão**: Use "{version}" como ID da versão.
-2. **Documentação** (<bpmn:documentation>): Inicie com "O modelo de processo proposto (To Be) descreve ".
-3. **Nomenclatura BPMN**:
-   - Tarefas: Verbos no Infinitivo.
-   - Gateways: Formulados como perguntas.
-4. **Estrutura obrigatória**:
-   - 1 Pool principal (com o nome do processo otimizado).
-   - Swimlanes (raias) para cada ator/setor.
-   - Setas (sequenceFlow) rigorosamente conectadas.
-   - Incorpore TODAS as melhorias/propostas aprovadas no novo fluxo.
-5. **Namespaces**: mesmos do padrão BPMN 2.0.
-6. **Inclua o BPMNDiagram** com coordenadas para cada shape e edge.
+Retorne APENAS um JSON válido com esta estrutura:
 
-OUTPUT: Gere APENAS o XML válido, sem explicações, sem marcadores de código. Comece com <?xml e termine com </bpmn:definitions>."""
+{{
+  "process_name": "Nome do processo otimizado",
+  "documentation": "O modelo de processo proposto (To Be) descreve ...",
+  "lanes": [
+    {{"id": "lane_1", "name": "Nome do Ator/Setor"}}
+  ],
+  "elements": [
+    {{"id": "start_1", "type": "startEvent", "name": "Início", "lane": "lane_1"}},
+    {{"id": "task_1", "type": "task", "name": "Verbo no Infinitivo", "lane": "lane_1"}},
+    {{"id": "end_1", "type": "endEvent", "name": "Fim", "lane": "lane_1"}}
+  ],
+  "flows": [
+    {{"id": "flow_1", "from": "start_1", "to": "task_1", "label": ""}}
+  ]
+}}
 
-    result = _chat(client, SYSTEM_PROMPT, prompt)
+REGRAS:
+1. INCORPORE todas as melhorias/propostas aprovadas no novo fluxo
+2. Tarefas: verbos no infinitivo. Gateways: perguntas
+3. IDs únicos, sem espaços
+4. Flows conectando todos os elementos logicamente
+5. Retorne APENAS o JSON"""
 
-    xml_text = result.strip()
+
+async def modulo_3b_redesenho_to_be(
+    relatorio_descoberta: str,
+    consultoria: str,
+    propostas_aprovadas: str
+) -> str:
+    """Chain-of-thought: extrai estrutura TO-BE → gera XML → auto-layout."""
+    client = get_client()
+    version = _get_version_to_be()
+
+    # Passo 1: Extrair estrutura TO-BE como JSON
+    prompt_1 = _STEP1_TOBE_PROMPT.format(
+        relatorio=relatorio_descoberta,
+        consultoria=consultoria,
+        propostas=propostas_aprovadas
+    )
+    structure_json = _chat(client, SYSTEM_PROMPT, prompt_1)
+    
+    structure_json = structure_json.strip()
+    if structure_json.startswith("```"):
+        structure_json = re.sub(r'^```(?:json)?\s*\n?', '', structure_json)
+        structure_json = re.sub(r'\n?\s*```$', '', structure_json)
+
+    # Passo 2: Gerar XML BPMN
+    prompt_2 = _STEP2_XML_PROMPT.format(
+        structure_json=structure_json,
+        version=version
+    )
+    xml_result = _chat(client, SYSTEM_PROMPT, prompt_2)
+    
+    xml_text = xml_result.strip()
     if xml_text.startswith("```"):
         xml_text = re.sub(r'^```(?:xml)?\s*\n?', '', xml_text)
         xml_text = re.sub(r'\n?\s*```$', '', xml_text)
+
+    # Passo 3: Auto-layout
+    from bpmn_generator import auto_layout_bpmn
+    xml_text = auto_layout_bpmn(xml_text)
 
     return xml_text
 
