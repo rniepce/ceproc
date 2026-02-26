@@ -34,6 +34,19 @@ def get_client():
     )
 
 
+def get_whisper_client():
+    """Client separado para Whisper, que usa api_version diferente."""
+    endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "").strip().rstrip("/")
+    api_key = os.getenv("AZURE_OPENAI_API_KEY")
+    if not endpoint or not api_key:
+        raise ValueError("AZURE_OPENAI_ENDPOINT e AZURE_OPENAI_API_KEY não configuradas.")
+    return AzureOpenAI(
+        azure_endpoint=endpoint,
+        api_key=api_key,
+        api_version="2024-06-01",
+    )
+
+
 # Deployment names — ajuste aqui se seus deployments tiverem nomes diferentes
 GPT_DEPLOYMENT = "gpt-5.2-chat"
 WHISPER_DEPLOYMENT = "whisper"
@@ -72,10 +85,11 @@ SYSTEM_PROMPT = (
 # ═══════════════════════════════════════════════════════════════════
 # TRANSCRIÇÃO DE ÁUDIO (Whisper)
 # ═══════════════════════════════════════════════════════════════════
-async def _transcribe_audio(client, audio_path: str) -> str:
+async def _transcribe_audio(audio_path: str) -> str:
     """Transcreve áudio usando o Whisper deployment do Azure OpenAI."""
+    whisper_client = get_whisper_client()
     with open(audio_path, "rb") as audio_file:
-        transcription = client.audio.transcriptions.create(
+        transcription = whisper_client.audio.transcriptions.create(
             model=WHISPER_DEPLOYMENT,
             file=audio_file,
             language="pt",
@@ -128,7 +142,7 @@ async def modulo_1_extracao_diagnostico(audio_path: str, filename: str) -> str:
     client = get_client()
 
     # Passo 1: Transcrever com Whisper
-    transcricao = await _transcribe_audio(client, audio_path)
+    transcricao = await _transcribe_audio(audio_path)
 
     # Passo 2: Analisar com GPT
     prompt = _MODULO_1_PROMPT.format(transcricao=transcricao)
