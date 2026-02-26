@@ -16,7 +16,21 @@ O usuário aprova antes de avançar ao próximo.
 import os
 import re
 from datetime import datetime
-from openai import OpenAI
+from urllib.parse import urlparse, urlunparse
+from openai import AzureOpenAI
+
+
+def _resource_base(endpoint: str) -> str:
+    """Extrai a URL base do recurso, removendo /api/projects/... se presente.
+    
+    O portal do Azure AI Foundry mostra o endpoint do projeto completo
+    (ex: https://xxx.services.ai.azure.com/api/projects/yyy), mas para
+    chamadas de inferência da API OpenAI precisamos apenas da URL do recurso
+    (ex: https://xxx.services.ai.azure.com).
+    """
+    parsed = urlparse(endpoint.rstrip("/"))
+    clean_path = re.sub(r"/api/projects/[^/]+/?$", "", parsed.path)
+    return urlunparse((parsed.scheme, parsed.netloc, clean_path, "", "", "")).rstrip("/")
 
 
 def get_client():
@@ -27,9 +41,11 @@ def get_client():
             "AZURE_OPENAI_ENDPOINT e AZURE_OPENAI_API_KEY não configuradas. "
             "Defina no arquivo .env"
         )
-    return OpenAI(
-        base_url=f"{endpoint}/openai/v1/",
+    base = _resource_base(endpoint)
+    return AzureOpenAI(
+        azure_endpoint=base,
         api_key=api_key,
+        api_version="2024-10-21",
     )
 
 
