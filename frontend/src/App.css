@@ -620,10 +620,120 @@ body {
 }
 
 .tab-content__text {
-  white-space: pre-wrap;
   font-size: var(--font-size-sm);
   line-height: 1.8;
   color: var(--gray-700);
+}
+
+/* ── Markdown Body (rendered reports) ───────────────────────── */
+.markdown-body {
+  white-space: normal;
+}
+
+.markdown-body h1 {
+  font-size: var(--font-size-2xl);
+  font-weight: 700;
+  color: var(--tjmg-azul);
+  margin: var(--space-xl) 0 var(--space-md);
+  padding-bottom: var(--space-sm);
+  border-bottom: 2px solid var(--gray-100);
+}
+
+.markdown-body h2 {
+  font-size: var(--font-size-xl);
+  font-weight: 700;
+  color: var(--tjmg-vinho);
+  margin: var(--space-lg) 0 var(--space-sm);
+}
+
+.markdown-body h3 {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--tjmg-azul);
+  margin: var(--space-md) 0 var(--space-xs);
+}
+
+.markdown-body h4 {
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  color: var(--gray-700);
+  margin: var(--space-sm) 0 var(--space-xs);
+}
+
+.markdown-body p {
+  margin: var(--space-sm) 0;
+}
+
+.markdown-body strong {
+  font-weight: 700;
+  color: var(--gray-800);
+}
+
+.markdown-body em {
+  font-style: italic;
+  color: var(--gray-600);
+}
+
+.markdown-body ul,
+.markdown-body ol {
+  margin: var(--space-sm) 0;
+  padding-left: var(--space-xl);
+}
+
+.markdown-body li {
+  margin: var(--space-xs) 0;
+}
+
+.markdown-body li::marker {
+  color: var(--tjmg-vinho);
+}
+
+.markdown-body blockquote {
+  border-left: 4px solid var(--tjmg-dourado);
+  margin: var(--space-md) 0;
+  padding: var(--space-sm) var(--space-lg);
+  background: rgba(197, 165, 90, 0.05);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  color: var(--gray-600);
+}
+
+.markdown-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: var(--space-md) 0;
+  font-size: var(--font-size-sm);
+}
+
+.markdown-body th {
+  background: var(--gray-50);
+  font-weight: 600;
+  color: var(--tjmg-azul);
+  text-align: left;
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--gray-200);
+}
+
+.markdown-body td {
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--gray-200);
+}
+
+.markdown-body tr:nth-child(even) {
+  background: var(--gray-50);
+}
+
+.markdown-body code {
+  background: var(--gray-100);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  font-size: 0.9em;
+  color: var(--tjmg-vinho);
+}
+
+.markdown-body hr {
+  border: none;
+  border-top: 1px solid var(--gray-200);
+  margin: var(--space-lg) 0;
 }
 
 /* BPMN Viewer */

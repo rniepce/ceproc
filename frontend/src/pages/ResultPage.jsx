@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import ReactMarkdown from 'react-markdown'
 import BpmnViewer from '../components/BpmnViewer'
 
 /**
@@ -84,7 +85,7 @@ export default function ResultPage({
                 />
                 <div className="tab-content">
                     <div className="tab-content__body">
-                        <div className="tab-content__text">{data.relatorio_descoberta}</div>
+                        <div className="tab-content__text markdown-body"><ReactMarkdown>{data.relatorio_descoberta}</ReactMarkdown></div>
                     </div>
                 </div>
                 <div className="module-actions">
@@ -163,7 +164,7 @@ export default function ResultPage({
 
                 <div className="tab-content">
                     <div className="tab-content__body">
-                        <div className="tab-content__text">{data.consultoria}</div>
+                        <div className="tab-content__text markdown-body"><ReactMarkdown>{data.consultoria}</ReactMarkdown></div>
                     </div>
                 </div>
 
@@ -305,17 +306,17 @@ export default function ResultPage({
                     {activeTab === 'bpmn_as_is' && <BpmnViewer xml={data.bpmn_xml_as_is} />}
                     {activeTab === 'relatorio' && (
                         <div className="tab-content__body">
-                            <div className="tab-content__text">{data.relatorio_descoberta}</div>
+                            <div className="tab-content__text markdown-body"><ReactMarkdown>{data.relatorio_descoberta}</ReactMarkdown></div>
                         </div>
                     )}
                     {activeTab === 'consultoria' && (
                         <div className="tab-content__body">
-                            <div className="tab-content__text">{data.consultoria}</div>
+                            <div className="tab-content__text markdown-body"><ReactMarkdown>{data.consultoria}</ReactMarkdown></div>
                         </div>
                     )}
                     {activeTab === 'pop' && (
                         <div className="tab-content__body">
-                            <div className="tab-content__text">{data.pop_texto}</div>
+                            <div className="tab-content__text markdown-body"><ReactMarkdown>{data.pop_texto}</ReactMarkdown></div>
                         </div>
                     )}
                 </div>
