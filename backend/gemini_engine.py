@@ -20,7 +20,7 @@ from openai import AzureOpenAI
 
 
 def get_client():
-    endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "").rstrip("/")
+    endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "").strip().rstrip("/")
     api_key = os.getenv("AZURE_OPENAI_API_KEY")
     if not endpoint or not api_key:
         raise ValueError(
