@@ -16,21 +16,20 @@ O usuário aprova antes de avançar ao próximo.
 import os
 import re
 from datetime import datetime
-from openai import AzureOpenAI
+from openai import OpenAI
 
 
 def get_client():
-    endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
+    endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "").rstrip("/")
     api_key = os.getenv("AZURE_OPENAI_API_KEY")
     if not endpoint or not api_key:
         raise ValueError(
             "AZURE_OPENAI_ENDPOINT e AZURE_OPENAI_API_KEY não configuradas. "
             "Defina no arquivo .env"
         )
-    return AzureOpenAI(
-        azure_endpoint=endpoint,
+    return OpenAI(
+        base_url=f"{endpoint}/openai/v1/",
         api_key=api_key,
-        api_version="2025-04-01-preview",
     )
 
 
