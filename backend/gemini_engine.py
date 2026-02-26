@@ -68,7 +68,6 @@ def _chat(client, system_prompt: str, user_prompt: str) -> str:
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ],
-        temperature=0.4,
         max_completion_tokens=16000,
     )
     return response.choices[0].message.content
