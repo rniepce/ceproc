@@ -51,6 +51,33 @@ async def health_check():
     return {"status": "ok", "gemini_configured": bool(os.getenv("GEMINI_API_KEY"))}
 
 
+@app.get("/api/test-azure")
+async def test_azure():
+    """Endpoint de diagnóstico: testa a conexão com o Azure OpenAI."""
+    from gemini_engine import get_client, GPT_DEPLOYMENT
+    try:
+        client = get_client()
+        endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "")
+        response = client.chat.completions.create(
+            model=GPT_DEPLOYMENT,
+            messages=[{"role": "user", "content": "Diga apenas: OK"}],
+            max_tokens=10,
+        )
+        return {
+            "status": "ok",
+            "endpoint_used": endpoint[:60] + "...",
+            "model": GPT_DEPLOYMENT,
+            "response": response.choices[0].message.content,
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "endpoint_used": os.getenv("AZURE_OPENAI_ENDPOINT", "NOT SET")[:80],
+            "error_type": type(e).__name__,
+            "error_detail": str(e),
+        }
+
+
 # ═══════════════════════════════════════════════════════════════════
 # MÓDULO 1: Extração e Diagnóstico AS-IS
 # ═══════════════════════════════════════════════════════════════════
