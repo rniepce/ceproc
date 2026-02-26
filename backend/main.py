@@ -78,6 +78,41 @@ async def test_azure():
         }
 
 
+@app.post("/api/test-whisper")
+async def test_whisper(file: UploadFile = File(...)):
+    """Endpoint de diagnóstico: testa o Whisper com um arquivo de áudio."""
+    from gemini_engine import get_whisper_client, WHISPER_DEPLOYMENT
+    try:
+        client = get_whisper_client()
+        content = await file.read()
+        
+        # Salvar em arquivo temporário
+        ext = Path(file.filename).suffix.lower() or ".wav"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
+            tmp.write(content)
+            tmp_path = tmp.name
+        
+        with open(tmp_path, "rb") as audio_file:
+            transcription = client.audio.transcriptions.create(
+                model=WHISPER_DEPLOYMENT,
+                file=audio_file,
+                language="pt",
+            )
+        
+        os.unlink(tmp_path)
+        return {
+            "status": "ok",
+            "deployment": WHISPER_DEPLOYMENT,
+            "transcription_preview": transcription.text[:200],
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "deployment": WHISPER_DEPLOYMENT,
+            "error_type": type(e).__name__,
+            "error_detail": str(e)[:500],
+        }
+
 # ═══════════════════════════════════════════════════════════════════
 # MÓDULO 1: Extração e Diagnóstico AS-IS
 # ═══════════════════════════════════════════════════════════════════
