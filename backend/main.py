@@ -61,7 +61,7 @@ async def test_azure():
         response = client.chat.completions.create(
             model=GPT_DEPLOYMENT,
             messages=[{"role": "user", "content": "Diga apenas: OK"}],
-            max_tokens=10,
+            max_completion_tokens=10,
         )
         return {
             "status": "ok",
