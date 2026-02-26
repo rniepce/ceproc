@@ -32,11 +32,9 @@ def prepare_bpmn_file(bpmn_xml: str) -> str:
     Takes raw BPMN XML and ensures it is properly formatted
     for import into Bizagi Modeler.
     """
-    # Ensure XML declaration
     if not bpmn_xml.strip().startswith("<?xml"):
         bpmn_xml = '<?xml version="1.0" encoding="UTF-8"?>\n' + bpmn_xml
 
-    # Ensure required namespaces are present
     required_ns = {
         'xmlns:bpmn': BPMN_NS,
         'xmlns:bpmndi': BPMNDI_NS,
@@ -55,52 +53,43 @@ def prepare_bpmn_file(bpmn_xml: str) -> str:
 
 
 def validate_bpmn_structure(bpmn_xml: str) -> dict:
-    """
-    Basic structural validation of BPMN XML.
-    Returns a dict with 'valid' flag and 'issues' list.
-    """
+    """Basic structural validation of BPMN XML."""
     issues = []
 
     if '<bpmn:definitions' not in bpmn_xml and '<definitions' not in bpmn_xml:
         issues.append("Missing <bpmn:definitions> root element")
-
     if '<bpmn:process' not in bpmn_xml and '<process' not in bpmn_xml:
         issues.append("Missing <bpmn:process> element")
-
     if '<bpmn:startEvent' not in bpmn_xml and '<startEvent' not in bpmn_xml:
         issues.append("Missing start event")
-
     if '<bpmn:endEvent' not in bpmn_xml and '<endEvent' not in bpmn_xml:
         issues.append("Missing end event")
-
     has_diagram = '<bpmndi:BPMNDiagram' in bpmn_xml or '<BPMNDiagram' in bpmn_xml
     if not has_diagram:
         issues.append("Missing BPMN diagram information (visual layout)")
 
-    return {
-        "valid": len(issues) == 0,
-        "issues": issues
-    }
+    return {"valid": len(issues) == 0, "issues": issues}
 
 
 # ═══════════════════════════════════════════════════════════════════
 # AUTO-LAYOUT: Calcula coordenadas para BPMNDiagram
 # ═══════════════════════════════════════════════════════════════════
 
-# Layout constants
-LANE_HEIGHT = 150
-LANE_PADDING_TOP = 30
-POOL_HEADER_WIDTH = 40
-ELEMENT_WIDTH = 100
-ELEMENT_HEIGHT = 80
-EVENT_SIZE = 36
-GATEWAY_SIZE = 50
-H_GAP = 60  # horizontal gap between elements
-V_CENTER_OFFSET = (LANE_HEIGHT - ELEMENT_HEIGHT) // 2
+# Layout constants — tuned for clear, readable diagrams
+POOL_HEADER_WIDTH = 50       # Width of pool header (name sidebar)
+LANE_HEADER_WIDTH = 30       # Width of lane header within pool
+LANE_HEIGHT = 200            # Height of each lane
+TASK_WIDTH = 140             # Width of task boxes
+TASK_HEIGHT = 80             # Height of task boxes
+EVENT_SIZE = 36              # Diameter of start/end events
+GATEWAY_SIZE = 50            # Size of gateway diamonds
+H_GAP = 80                   # Horizontal gap between elements
+LEFT_MARGIN = 100            # Left margin before first element
+TOP_MARGIN = 10              # Top margin within lane
 
-# Element type dimensions
+# Dimensions lookup by element type
 DIMS = {
-    "task": (ELEMENT_WIDTH, ELEMENT_HEIGHT),
+    "task": (TASK_WIDTH, TASK_HEIGHT),
     "event": (EVENT_SIZE, EVENT_SIZE),
     "gateway": (GATEWAY_SIZE, GATEWAY_SIZE),
 }
@@ -118,14 +107,15 @@ def _classify_element(tag: str) -> str:
 
 def auto_layout_bpmn(bpmn_xml: str) -> str:
     """
-    Recebe XML BPMN 2.0 SEM seção <bpmndi:BPMNDiagram> e calcula
-    coordenadas automáticas para todos os elementos.
-    
+    Recebe XML BPMN 2.0 e recalcula o <bpmndi:BPMNDiagram> com
+    coordenadas automáticas limpas e espaçadas.
+
     Strategy:
-    - Distribui elementos horizontalmente na ordem em que aparecem
-      no sequenceFlow (seguindo o fluxo).
-    - Cada lane recebe uma faixa vertical de LANE_HEIGHT pixels.
-    - Elementos são centralizados verticalmente dentro da lane.
+    1. Parse XML e coleta elementos, fluxos, e lanes
+    2. Ordena elementos por BFS seguindo sequenceFlows
+    3. Atribui coluna (posição horizontal) a cada elemento
+    4. Centraliza verticalmente dentro de sua lane
+    5. Gera waypoints para edges, com pontos intermediários para cross-lane
     """
     try:
         # Remove existing diagram section if present
@@ -133,23 +123,18 @@ def auto_layout_bpmn(bpmn_xml: str) -> str:
             r'<bpmndi:BPMNDiagram.*?</bpmndi:BPMNDiagram>',
             '', bpmn_xml, flags=re.DOTALL
         )
-
         root = ET.fromstring(bpmn_xml)
     except ET.ParseError:
-        # If XML is invalid, return as-is
         return bpmn_xml
 
-    # Find the process element
+    # ── Find the process element ────────────────────────────────
     process = root.find(f".//{{{BPMN_NS}}}process")
-    if process is None:
-        # Try within collaboration/participant
-        process = root.find(f".//{{{BPMN_NS}}}process")
     if process is None:
         return bpmn_xml
 
     process_id = process.get("id", "Process_1")
 
-    # ── Collect all flow elements ────────────────────────────────
+    # ── Collect all flow elements ───────────────────────────────
     flow_elements = {}  # id → (tag_type, element)
     for elem in process:
         tag = elem.tag.split("}")[-1] if "}" in elem.tag else elem.tag
@@ -157,7 +142,10 @@ def auto_layout_bpmn(bpmn_xml: str) -> str:
         if elem_id and tag not in ("sequenceFlow", "laneSet", "documentation"):
             flow_elements[elem_id] = (_classify_element(tag), elem)
 
-    # ── Collect sequence flows ───────────────────────────────────
+    if not flow_elements:
+        return bpmn_xml
+
+    # ── Collect sequence flows ──────────────────────────────────
     flows = []
     for sf in process.findall(f"{{{BPMN_NS}}}sequenceFlow"):
         src = sf.get("sourceRef")
@@ -166,9 +154,9 @@ def auto_layout_bpmn(bpmn_xml: str) -> str:
         if src and tgt and sf_id:
             flows.append((sf_id, src, tgt))
 
-    # ── Identify lanes ──────────────────────────────────────────
+    # ── Identify lanes ─────────────────────────────────────────
     lane_set = process.find(f"{{{BPMN_NS}}}laneSet")
-    lanes = []  # list of (lane_id, lane_name, [element_ids])
+    lanes = []
     element_to_lane = {}
 
     if lane_set is not None:
@@ -179,30 +167,23 @@ def auto_layout_bpmn(bpmn_xml: str) -> str:
             lanes.append((lane_id, lane_name, refs))
             for ref in refs:
                 element_to_lane[ref] = lane_id
-    
+
     if not lanes:
-        # No lanes defined — create a single default lane
         all_ids = list(flow_elements.keys())
         lanes = [("Lane_default", "Processo", all_ids)]
         for eid in all_ids:
             element_to_lane[eid] = "Lane_default"
 
-    # ── Order elements by flow ──────────────────────────────────
-    # Build adjacency for topological-ish ordering
+    # ── BFS ordering following flows ───────────────────────────
     successors = {}
-    predecessors = {}
     for _, src, tgt in flows:
         successors.setdefault(src, []).append(tgt)
-        predecessors.setdefault(tgt, []).append(src)
 
-    # Find start elements (no predecessors)
     all_targets = {tgt for _, _, tgt in flows}
-    all_sources = {src for _, src, _ in flows}
     start_ids = [eid for eid in flow_elements if eid not in all_targets]
     if not start_ids:
         start_ids = list(flow_elements.keys())[:1]
 
-    # BFS ordering
     ordered = []
     visited = set()
     queue = list(start_ids)
@@ -216,48 +197,53 @@ def auto_layout_bpmn(bpmn_xml: str) -> str:
         for nxt in successors.get(current, []):
             if nxt not in visited:
                 queue.append(nxt)
-    
-    # Add any remaining unvisited elements
+
+    # Add unvisited elements
     for eid in flow_elements:
         if eid not in visited:
             ordered.append(eid)
 
-    # ── Assign column positions per lane ────────────────────────
-    lane_columns = {lid: 0 for lid, _, _ in lanes}
-    element_positions = {}  # id → (x, y, w, h)
+    # ── Assign global column for each element (by BFS order) ───
+    # Elements in same column should never overlap
+    element_column = {}
+    global_col = 0
+    for elem_id in ordered:
+        element_column[elem_id] = global_col
+        global_col += 1
 
+    # ── Calculate positions ────────────────────────────────────
     lane_y_offsets = {}
     y_cursor = 0
-    for lane_id, lane_name, _ in lanes:
+    for lane_id, _, _ in lanes:
         lane_y_offsets[lane_id] = y_cursor
         y_cursor += LANE_HEIGHT
 
     total_height = y_cursor
+    element_positions = {}  # id → (x, y, w, h)
 
     for elem_id in ordered:
         if elem_id not in flow_elements:
             continue
         elem_type, _ = flow_elements[elem_id]
         lane_id = element_to_lane.get(elem_id, lanes[0][0])
-        
-        col = lane_columns.get(lane_id, 0)
+        col = element_column[elem_id]
+
         w, h = DIMS.get(elem_type, DIMS["task"])
-        
-        x = POOL_HEADER_WIDTH + H_GAP + col * (ELEMENT_WIDTH + H_GAP)
+        x = POOL_HEADER_WIDTH + LANE_HEADER_WIDTH + LEFT_MARGIN + col * (TASK_WIDTH + H_GAP)
         lane_y = lane_y_offsets.get(lane_id, 0)
+        # Center vertically in lane
         y = lane_y + (LANE_HEIGHT - h) // 2
 
         element_positions[elem_id] = (x, y, w, h)
-        lane_columns[lane_id] = col + 1
 
     # Calculate total width
-    max_col = max(lane_columns.values()) if lane_columns else 1
-    total_width = POOL_HEADER_WIDTH + (max_col + 1) * (ELEMENT_WIDTH + H_GAP)
+    max_x = max((x + w) for x, y, w, h in element_positions.values()) if element_positions else 500
+    total_width = max_x + LEFT_MARGIN
 
-    # ── Find collaboration & participant ────────────────────────
+    # ── Find collaboration & participant ───────────────────────
     collaboration = root.find(f"{{{BPMN_NS}}}collaboration")
     collab_id = collaboration.get("id", "Collaboration_1") if collaboration is not None else "Collaboration_1"
-    
+
     participant = None
     participant_id = "Participant_1"
     if collaboration is not None:
@@ -265,12 +251,12 @@ def auto_layout_bpmn(bpmn_xml: str) -> str:
         if participant is not None:
             participant_id = participant.get("id", "Participant_1")
 
-    # ── Build BPMNDiagram ───────────────────────────────────────
+    # ── Build BPMNDiagram ──────────────────────────────────────
     diagram = ET.SubElement(root, f"{{{BPMNDI_NS}}}BPMNDiagram", id="BPMNDiagram_1")
     plane = ET.SubElement(diagram, f"{{{BPMNDI_NS}}}BPMNPlane", id="BPMNPlane_1",
                           bpmnElement=collab_id)
 
-    # Pool shape (participant)
+    # Pool shape (horizontal)
     if participant is not None:
         pool_shape = ET.SubElement(plane, f"{{{BPMNDI_NS}}}BPMNShape",
                                    id=f"{participant_id}_di",
@@ -302,20 +288,46 @@ def auto_layout_bpmn(bpmn_xml: str) -> str:
                       x=str(x), y=str(y),
                       width=str(w), height=str(h))
 
-    # Edge shapes (sequence flows)
+    # Edge shapes with smart waypoints
     for sf_id, src, tgt in flows:
-        if src in element_positions and tgt in element_positions:
-            edge = ET.SubElement(plane, f"{{{BPMNDI_NS}}}BPMNEdge",
-                                 id=f"{sf_id}_di",
-                                 bpmnElement=sf_id)
-            sx, sy, sw, sh = element_positions[src]
-            tx, ty, tw, th = element_positions[tgt]
-            # Start from right-center of source, end at left-center of target
-            ET.SubElement(edge, f"{{{DI_NS}}}waypoint",
-                          x=str(sx + sw), y=str(sy + sh // 2))
-            ET.SubElement(edge, f"{{{DI_NS}}}waypoint",
-                          x=str(tx), y=str(ty + th // 2))
+        if src not in element_positions or tgt not in element_positions:
+            continue
 
-    # ── Serialize back to XML string ────────────────────────────
+        edge = ET.SubElement(plane, f"{{{BPMNDI_NS}}}BPMNEdge",
+                             id=f"{sf_id}_di",
+                             bpmnElement=sf_id)
+
+        sx, sy, sw, sh = element_positions[src]
+        tx, ty, tw, th = element_positions[tgt]
+
+        # Source: right-center
+        src_x = sx + sw
+        src_y = sy + sh // 2
+        # Target: left-center
+        tgt_x = tx
+        tgt_y = ty + th // 2
+
+        src_lane = element_to_lane.get(src, "")
+        tgt_lane = element_to_lane.get(tgt, "")
+
+        if src_lane == tgt_lane or abs(src_y - tgt_y) < 20:
+            # Same lane: simple straight line
+            ET.SubElement(edge, f"{{{DI_NS}}}waypoint",
+                          x=str(src_x), y=str(src_y))
+            ET.SubElement(edge, f"{{{DI_NS}}}waypoint",
+                          x=str(tgt_x), y=str(tgt_y))
+        else:
+            # Cross-lane: use orthogonal routing (right-angle connectors)
+            mid_x = (src_x + tgt_x) // 2
+            ET.SubElement(edge, f"{{{DI_NS}}}waypoint",
+                          x=str(src_x), y=str(src_y))
+            ET.SubElement(edge, f"{{{DI_NS}}}waypoint",
+                          x=str(mid_x), y=str(src_y))
+            ET.SubElement(edge, f"{{{DI_NS}}}waypoint",
+                          x=str(mid_x), y=str(tgt_y))
+            ET.SubElement(edge, f"{{{DI_NS}}}waypoint",
+                          x=str(tgt_x), y=str(tgt_y))
+
+    # ── Serialize back to XML string ───────────────────────────
     xml_str = ET.tostring(root, encoding="unicode", xml_declaration=True)
     return xml_str
