@@ -82,73 +82,114 @@ SYSTEM_PROMPT = (
 
 
 # ═══════════════════════════════════════════════════════════════════
-# TRANSCRIÇÃO DE ÁUDIO (Whisper + ffmpeg preprocessing)
+# TRANSCRIÇÃO DE ÁUDIO (Whisper + ffmpeg preprocessing + chunking)
 # ═══════════════════════════════════════════════════════════════════
 import subprocess
 import tempfile as _tempfile
+import glob
 
 MAX_WHISPER_SIZE = 24 * 1024 * 1024  # 24MB limit
+CHUNK_DURATION = 600  # 10 minutes per chunk
 
 
 def _convert_audio_to_mp3(input_path: str) -> str:
     """Converte áudio/vídeo para MP3 mono otimizado via ffmpeg.
-    Mesmo pipeline do dora2: 128kbps, 22050Hz, mono.
+    Bitrate reduzido para 64kbps para minimizar tamanho.
     """
     output_path = input_path.rsplit(".", 1)[0] + "_converted.mp3"
     cmd = [
         "ffmpeg", "-i", input_path,
         "-vn",                    # remove video
         "-acodec", "libmp3lame",  # MP3 codec
-        "-ab", "128k",            # 128kbps bitrate
-        "-ar", "22050",           # 22050Hz sample rate
+        "-ab", "64k",             # 64kbps (suficiente para voz)
+        "-ar", "16000",           # 16kHz (otimizado para speech)
         "-ac", "1",               # mono
         "-y",                     # overwrite
         output_path
     ]
     try:
-        subprocess.run(cmd, capture_output=True, check=True, timeout=120)
+        subprocess.run(cmd, capture_output=True, check=True, timeout=300)
         return output_path
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        # Se ffmpeg não está disponível, tenta enviar o original
         print(f"[WARN] ffmpeg falhou: {e}, usando arquivo original")
         return input_path
 
 
+def _split_audio_chunks(mp3_path: str) -> list[str]:
+    """Divide o áudio em chunks de CHUNK_DURATION segundos usando ffmpeg."""
+    base = mp3_path.rsplit(".", 1)[0]
+    pattern = f"{base}_chunk_%03d.mp3"
+    cmd = [
+        "ffmpeg", "-i", mp3_path,
+        "-f", "segment",
+        "-segment_time", str(CHUNK_DURATION),
+        "-acodec", "libmp3lame",
+        "-ab", "64k",
+        "-ar", "16000",
+        "-ac", "1",
+        "-y",
+        pattern
+    ]
+    try:
+        subprocess.run(cmd, capture_output=True, check=True, timeout=300)
+    except subprocess.CalledProcessError as e:
+        print(f"[WARN] Chunking falhou: {e}")
+        return [mp3_path]
+    
+    chunks = sorted(glob.glob(f"{base}_chunk_*.mp3"))
+    return chunks if chunks else [mp3_path]
+
+
+def _transcribe_single_file(whisper_client, file_path: str) -> str:
+    """Transcreve um único arquivo de áudio com Whisper."""
+    with open(file_path, "rb") as audio_file:
+        transcription = whisper_client.audio.transcriptions.create(
+            model=WHISPER_DEPLOYMENT,
+            file=audio_file,
+            language="pt",
+        )
+    if hasattr(transcription, 'text'):
+        return transcription.text
+    return str(transcription)
+
+
 async def _transcribe_audio(audio_path: str) -> str:
     """Transcreve áudio usando o Whisper deployment do Azure OpenAI.
-    Pré-processa com ffmpeg (mono MP3 128k) para evitar erros 500.
+    Pipeline: ffmpeg convert → check size → chunk if needed → transcribe → merge.
     """
     whisper_client = get_whisper_client()
-    
-    # Pré-processar áudio com ffmpeg
     converted_path = _convert_audio_to_mp3(audio_path)
+    cleanup_files = []
     
     try:
-        # Verificar tamanho do arquivo
-        file_size = os.path.getsize(converted_path)
-        if file_size > MAX_WHISPER_SIZE:
-            raise ValueError(
-                f"Arquivo de áudio muito grande ({file_size // (1024*1024)}MB). "
-                f"Máximo suportado: {MAX_WHISPER_SIZE // (1024*1024)}MB."
-            )
-        
-        with open(converted_path, "rb") as audio_file:
-            transcription = whisper_client.audio.transcriptions.create(
-                model=WHISPER_DEPLOYMENT,
-                file=audio_file,
-                language="pt",
-                response_format="verbose_json",
-            )
-        
-        # verbose_json retorna objeto com .text
-        if hasattr(transcription, 'text'):
-            return transcription.text
-        return str(transcription)
-    finally:
-        # Limpar arquivo convertido se diferente do original
         if converted_path != audio_path:
+            cleanup_files.append(converted_path)
+        
+        file_size = os.path.getsize(converted_path)
+        print(f"[INFO] Áudio convertido: {file_size // (1024*1024)}MB")
+        
+        if file_size <= MAX_WHISPER_SIZE:
+            # Arquivo pequeno: transcreve direto
+            return _transcribe_single_file(whisper_client, converted_path)
+        
+        # Arquivo grande: dividir em chunks
+        print(f"[INFO] Arquivo grande ({file_size // (1024*1024)}MB), dividindo em chunks de {CHUNK_DURATION}s...")
+        chunks = _split_audio_chunks(converted_path)
+        cleanup_files.extend(chunks)
+        
+        all_texts = []
+        for i, chunk_path in enumerate(chunks):
+            chunk_size = os.path.getsize(chunk_path)
+            print(f"[INFO] Transcrevendo chunk {i+1}/{len(chunks)} ({chunk_size // (1024*1024)}MB)...")
+            text = _transcribe_single_file(whisper_client, chunk_path)
+            all_texts.append(text)
+        
+        return "\n\n".join(all_texts)
+    
+    finally:
+        for f in cleanup_files:
             try:
-                os.unlink(converted_path)
+                os.unlink(f)
             except:
                 pass
 
