@@ -132,6 +132,8 @@ export default function ResultPage({
                     <BpmnViewer xml={data.bpmn_xml_as_is} />
                 </div>
 
+                <ChatPanel context={`RELATÓRIO DE DESCOBERTA:\n${data.relatorio_descoberta}\n\nBPMN XML AS-IS:\n${data.bpmn_xml_as_is?.substring(0, 3000)}`} />
+
                 <div className="module-actions">
                     <div className="module-actions__row">
                         <button className="btn btn--secondary" onClick={() => downloadBpmn(data.bpmn_xml_as_is, 'processo_as_is')}>
