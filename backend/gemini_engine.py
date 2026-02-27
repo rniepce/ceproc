@@ -43,7 +43,7 @@ def get_whisper_client():
     return AzureOpenAI(
         azure_endpoint=endpoint,
         api_key=api_key,
-        api_version="2024-06-01",
+        api_version="2025-01-01",
     )
 
 
