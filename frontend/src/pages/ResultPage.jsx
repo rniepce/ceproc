@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import BpmnViewer from '../components/BpmnViewer'
+import ChatPanel from '../components/ChatPanel'
 
 /**
  * ResultPage handles all review states:
@@ -88,6 +89,9 @@ export default function ResultPage({
                         <div className="tab-content__text markdown-body"><ReactMarkdown>{data.relatorio_descoberta}</ReactMarkdown></div>
                     </div>
                 </div>
+
+                <ChatPanel context={data.relatorio_descoberta} />
+
                 <div className="module-actions">
                     <p className="module-actions__question">
                         Deseja gerar o código BPMN (Módulo 2)?

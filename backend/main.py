@@ -170,6 +170,49 @@ async def run_modulo_1_text(request: Modulo1TextRequest):
 
 
 # ═══════════════════════════════════════════════════════════════════
+# CHAT: Conversa com o LLM sobre o relatório
+# ═══════════════════════════════════════════════════════════════════
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
+class ChatRequest(BaseModel):
+    context: str  # relatório de descoberta ou outro contexto
+    messages: list[ChatMessage]  # histórico de mensagens
+
+@app.post("/api/chat")
+async def chat_with_llm(request: ChatRequest):
+    """Chat conversacional com o LLM usando contexto do relatório."""
+    from gemini_engine import get_client, GPT_DEPLOYMENT, SYSTEM_PROMPT
+    try:
+        client = get_client()
+
+        system_msg = (
+            f"{SYSTEM_PROMPT}\n\n"
+            "Você está em uma sessão de chat com o usuário sobre o seguinte relatório. "
+            "Responda de forma clara e concisa. Se o usuário pedir modificações no relatório, "
+            "gere a versão atualizada completa.\n\n"
+            f"--- RELATÓRIO ---\n{request.context}\n--- FIM ---"
+        )
+
+        api_messages = [{"role": "system", "content": system_msg}]
+        for msg in request.messages:
+            api_messages.append({"role": msg.role, "content": msg.content})
+
+        response = client.chat.completions.create(
+            model=GPT_DEPLOYMENT,
+            messages=api_messages,
+            max_completion_tokens=8000,
+        )
+
+        reply = response.choices[0].message.content
+        return {"success": True, "reply": reply}
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(500, f"Erro no chat: {str(e)}")
+
+
+# ═══════════════════════════════════════════════════════════════════
 # MÓDULO 2: Conversor BPMN-XML (AS-IS)
 # ═══════════════════════════════════════════════════════════════════
 class Modulo2Request(BaseModel):
