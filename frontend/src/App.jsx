@@ -270,7 +270,7 @@ export default function App() {
             </main>
 
             <footer className="footer">
-                CEPROC — Centro de Estudos de Procedimentos · Tribunal de Justiça do Estado de Minas Gerais · 2026
+                CEPROC — Centro de Gestão de Processos de Trabalho e de Segurança da Informação · Tribunal de Justiça do Estado de Minas Gerais · 2026
             </footer>
         </>
     )
