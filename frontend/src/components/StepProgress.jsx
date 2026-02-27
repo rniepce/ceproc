@@ -3,7 +3,7 @@ import React from 'react'
 const STEPS = [
     {
         title: 'Módulo 1 — Extração e Diagnóstico AS-IS',
-        desc: 'Analisando o áudio e gerando Relatório de Descoberta (8 eixos)',
+        desc: 'Analisando o áudio/texto e gerando Relatório de Descoberta (8 eixos)',
     },
     {
         title: 'Módulo 2 — Conversor BPMN-XML',
