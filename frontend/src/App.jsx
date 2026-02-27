@@ -233,7 +233,7 @@ export default function App() {
 
                 {isProcessing && (
                     <StepProgress currentStep={getActiveStep()} processingLabel={
-                        view === 'modulo1' ? 'Analisando o áudio e gerando Relatório de Descoberta...' :
+                        view === 'modulo1' ? 'Analisando o áudio/texto e gerando Relatório de Descoberta...' :
                             view === 'modulo2' ? 'Convertendo fluxo para BPMN XML (AS-IS)...' :
                                 view === 'modulo3a' ? 'Executando consultoria Lean...' :
                                     view === 'modulo3b' ? 'Gerando novo fluxo BPMN (TO-BE)...' :
