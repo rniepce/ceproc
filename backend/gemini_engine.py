@@ -82,18 +82,75 @@ SYSTEM_PROMPT = (
 
 
 # ═══════════════════════════════════════════════════════════════════
-# TRANSCRIÇÃO DE ÁUDIO (Whisper)
+# TRANSCRIÇÃO DE ÁUDIO (Whisper + ffmpeg preprocessing)
 # ═══════════════════════════════════════════════════════════════════
+import subprocess
+import tempfile as _tempfile
+
+MAX_WHISPER_SIZE = 24 * 1024 * 1024  # 24MB limit
+
+
+def _convert_audio_to_mp3(input_path: str) -> str:
+    """Converte áudio/vídeo para MP3 mono otimizado via ffmpeg.
+    Mesmo pipeline do dora2: 128kbps, 22050Hz, mono.
+    """
+    output_path = input_path.rsplit(".", 1)[0] + "_converted.mp3"
+    cmd = [
+        "ffmpeg", "-i", input_path,
+        "-vn",                    # remove video
+        "-acodec", "libmp3lame",  # MP3 codec
+        "-ab", "128k",            # 128kbps bitrate
+        "-ar", "22050",           # 22050Hz sample rate
+        "-ac", "1",               # mono
+        "-y",                     # overwrite
+        output_path
+    ]
+    try:
+        subprocess.run(cmd, capture_output=True, check=True, timeout=120)
+        return output_path
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        # Se ffmpeg não está disponível, tenta enviar o original
+        print(f"[WARN] ffmpeg falhou: {e}, usando arquivo original")
+        return input_path
+
+
 async def _transcribe_audio(audio_path: str) -> str:
-    """Transcreve áudio usando o Whisper deployment do Azure OpenAI."""
+    """Transcreve áudio usando o Whisper deployment do Azure OpenAI.
+    Pré-processa com ffmpeg (mono MP3 128k) para evitar erros 500.
+    """
     whisper_client = get_whisper_client()
-    with open(audio_path, "rb") as audio_file:
-        transcription = whisper_client.audio.transcriptions.create(
-            model=WHISPER_DEPLOYMENT,
-            file=audio_file,
-            language="pt",
-        )
-    return transcription.text
+    
+    # Pré-processar áudio com ffmpeg
+    converted_path = _convert_audio_to_mp3(audio_path)
+    
+    try:
+        # Verificar tamanho do arquivo
+        file_size = os.path.getsize(converted_path)
+        if file_size > MAX_WHISPER_SIZE:
+            raise ValueError(
+                f"Arquivo de áudio muito grande ({file_size // (1024*1024)}MB). "
+                f"Máximo suportado: {MAX_WHISPER_SIZE // (1024*1024)}MB."
+            )
+        
+        with open(converted_path, "rb") as audio_file:
+            transcription = whisper_client.audio.transcriptions.create(
+                model=WHISPER_DEPLOYMENT,
+                file=audio_file,
+                language="pt",
+                response_format="verbose_json",
+            )
+        
+        # verbose_json retorna objeto com .text
+        if hasattr(transcription, 'text'):
+            return transcription.text
+        return str(transcription)
+    finally:
+        # Limpar arquivo convertido se diferente do original
+        if converted_path != audio_path:
+            try:
+                os.unlink(converted_path)
+            except:
+                pass
 
 
 # ═══════════════════════════════════════════════════════════════════
