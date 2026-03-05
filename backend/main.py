@@ -434,6 +434,56 @@ async def generate_dpt_file(file: UploadFile = File(...)):
 
 
 # ═══════════════════════════════════════════════════════════════════
+# KPI Generator (Matriz de Indicadores e Metas)
+# ═══════════════════════════════════════════════════════════════════
+@app.post("/api/generate-kpi")
+async def generate_kpi_file(
+    file: UploadFile = File(...),
+    unidade: str = "CEPROC",
+    cliente: str = "",
+    elaborado_por: str = "CEPROC",
+    aprovado_por: str = "",
+):
+    """Upload de .bpmn → Download Excel (.xlsx) com Matriz de Indicadores."""
+    from bpmn_parser import parse_bpmn
+    from kpi_generator import generate_kpi_excel
+
+    ext = Path(file.filename).suffix.lower()
+    if ext not in {".bpmn", ".xml", ".xpdl"}:
+        raise HTTPException(400, f"Formato não suportado: {ext}. Use .bpmn, .xml ou .xpdl")
+
+    try:
+        content = await file.read()
+        xml_content = content.decode("utf-8")
+    except Exception as e:
+        raise HTTPException(400, f"Erro ao ler arquivo: {str(e)}")
+
+    try:
+        model = parse_bpmn(xml_content)
+        xlsx_bytes = await generate_kpi_excel(
+            model,
+            unidade=unidade,
+            cliente=cliente,
+            elaborado_por=elaborado_por,
+            aprovado_por=aprovado_por,
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(500, f"Erro ao gerar Indicadores: {str(e)}")
+
+    process_name = model.process_name or "Processo"
+    safe_name = process_name.replace(" ", "_")[:50]
+
+    return Response(
+        content=xlsx_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="IND_{safe_name}.xlsx"'}
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════
 # Serve Built Frontend (Production)
 # ═══════════════════════════════════════════════════════════════════
 STATIC_DIR = Path(__file__).parent / "static"

@@ -8,6 +8,7 @@ export default function BpmnLinterPage() {
     const [isDragging, setIsDragging] = useState(false)
     const [loading, setLoading] = useState(false)
     const [loadingDpt, setLoadingDpt] = useState(false)
+    const [loadingKpi, setLoadingKpi] = useState(false)
     const [report, setReport] = useState(null)
     const [error, setError] = useState('')
     const inputRef = useRef(null)
@@ -84,6 +85,34 @@ export default function BpmnLinterPage() {
         }
     }
 
+    const handleGenerateKpi = async () => {
+        if (!file) return
+        setLoadingKpi(true)
+
+        try {
+            const formData = new FormData()
+            formData.append('file', file)
+            const res = await fetch('/api/generate-kpi', { method: 'POST', body: formData })
+
+            if (!res.ok) {
+                const err = await res.json()
+                throw new Error(err.detail || 'Erro ao gerar Indicadores')
+            }
+
+            const blob = await res.blob()
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = `IND_${file.name.replace('.bpmn', '')}.xlsx`
+            a.click()
+            URL.revokeObjectURL(url)
+        } catch (e) {
+            alert(e.message)
+        } finally {
+            setLoadingKpi(false)
+        }
+    }
+
     const handleReset = () => {
         setFile(null)
         setReport(null)
@@ -103,11 +132,11 @@ export default function BpmnLinterPage() {
         <div className="upload-page">
             <div className="upload-hero">
                 <h2 className="upload-hero__title">
-                    Validador <span>BPMN</span> e Gerador de DPT
+                    Validador <span>BPMN</span>, DPT e Indicadores
                 </h2>
                 <p className="upload-hero__desc">
                     Faça upload do arquivo .bpmn exportado do Bizagi para validar conforme
-                    o Manual de Boas Práticas COGEPRO/TJMG e gerar o Documento Descritivo do Processo (DPT).
+                    o Manual de Boas Práticas COGEPRO/TJMG, gerar o DPT e a Matriz de Indicadores.
                 </p>
             </div>
 
@@ -272,6 +301,22 @@ export default function BpmnLinterPage() {
                                         </>
                                     ) : (
                                         <>📄 Gerar DPT (.docx)</>
+                                    )}
+                                </button>
+                            )}
+                            {canGenerateDpt && (
+                                <button
+                                    className="btn btn--primary btn--lg"
+                                    onClick={handleGenerateKpi}
+                                    disabled={loadingKpi}
+                                >
+                                    {loadingKpi ? (
+                                        <>
+                                            <span className="step-item__spinner" style={{ width: 16, height: 16 }} />
+                                            Gerando Indicadores...
+                                        </>
+                                    ) : (
+                                        <>📊 Gerar Indicadores (.xlsx)</>
                                     )}
                                 </button>
                             )}
