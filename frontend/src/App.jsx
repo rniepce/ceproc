@@ -3,6 +3,7 @@ import Header from './components/Header'
 import StepProgress from './components/StepProgress'
 import UploadPage from './pages/UploadPage'
 import ResultPage from './pages/ResultPage'
+import BpmnLinterPage from './pages/BpmnLinterPage'
 
 /*
   Flow:
@@ -20,6 +21,7 @@ import ResultPage from './pages/ResultPage'
 */
 
 export default function App() {
+    const [activePage, setActivePage] = useState('mapeador') // 'mapeador' | 'linter'
     const [view, setView] = useState('upload')
     const [error, setError] = useState('')
 
@@ -226,46 +228,69 @@ export default function App() {
     return (
         <>
             <Header />
+
+            {/* Navigation Tabs */}
+            <nav className="app-nav">
+                <button
+                    className={`app-nav__tab ${activePage === 'mapeador' ? 'app-nav__tab--active' : ''}`}
+                    onClick={() => setActivePage('mapeador')}
+                >
+                    🎙️ Mapeador de Processos
+                </button>
+                <button
+                    className={`app-nav__tab ${activePage === 'linter' ? 'app-nav__tab--active' : ''}`}
+                    onClick={() => setActivePage('linter')}
+                >
+                    ✅ Validador BPMN / DPT
+                </button>
+            </nav>
+
             <main className="main">
-                {view === 'upload' && (
-                    <UploadPage onProcess={handleUpload} onProcessText={handleTextUpload} />
-                )}
+                {activePage === 'linter' ? (
+                    <BpmnLinterPage />
+                ) : (
+                    <>
+                        {view === 'upload' && (
+                            <UploadPage onProcess={handleUpload} onProcessText={handleTextUpload} />
+                        )}
 
-                {isProcessing && (
-                    <StepProgress currentStep={getActiveStep()} processingLabel={
-                        view === 'modulo1' ? 'Analisando o áudio/texto e gerando Relatório de Descoberta...' :
-                            view === 'modulo2' ? 'Convertendo fluxo para BPMN XML (AS-IS)...' :
-                                view === 'modulo3a' ? 'Executando consultoria Lean...' :
-                                    view === 'modulo3b' ? 'Gerando novo fluxo BPMN (TO-BE)...' :
-                                        view === 'modulo4' ? 'Gerando Procedimento Operacional Padrão...' : ''
-                    } />
-                )}
+                        {isProcessing && (
+                            <StepProgress currentStep={getActiveStep()} processingLabel={
+                                view === 'modulo1' ? 'Analisando o áudio/texto e gerando Relatório de Descoberta...' :
+                                    view === 'modulo2' ? 'Convertendo fluxo para BPMN XML (AS-IS)...' :
+                                        view === 'modulo3a' ? 'Executando consultoria Lean...' :
+                                            view === 'modulo3b' ? 'Gerando novo fluxo BPMN (TO-BE)...' :
+                                                view === 'modulo4' ? 'Gerando Procedimento Operacional Padrão...' : ''
+                            } />
+                        )}
 
-                {(view.startsWith('review') || view === 'final') && (
-                    <ResultPage
-                        view={view}
-                        data={sessionData}
-                        onApproveModulo2={handleModulo2}
-                        onApproveModulo3a={handleModulo3a}
-                        onApproveModulo3b={handleModulo3b}
-                        onApproveModulo4={handleModulo4}
-                        onReset={handleReset}
-                    />
-                )}
+                        {(view.startsWith('review') || view === 'final') && (
+                            <ResultPage
+                                view={view}
+                                data={sessionData}
+                                onApproveModulo2={handleModulo2}
+                                onApproveModulo3a={handleModulo3a}
+                                onApproveModulo3b={handleModulo3b}
+                                onApproveModulo4={handleModulo4}
+                                onReset={handleReset}
+                            />
+                        )}
 
-                {view === 'error' && (
-                    <div className="upload-page">
-                        <div className="error-banner">
-                            <span className="error-banner__icon">❌</span>
-                            <div className="error-banner__content">
-                                <div className="error-banner__title">Erro no Processamento</div>
-                                <div className="error-banner__message">{error}</div>
+                        {view === 'error' && (
+                            <div className="upload-page">
+                                <div className="error-banner">
+                                    <span className="error-banner__icon">❌</span>
+                                    <div className="error-banner__content">
+                                        <div className="error-banner__title">Erro no Processamento</div>
+                                        <div className="error-banner__message">{error}</div>
+                                    </div>
+                                </div>
+                                <button className="btn btn--primary" onClick={handleReset}>
+                                    Tentar Novamente
+                                </button>
                             </div>
-                        </div>
-                        <button className="btn btn--primary" onClick={handleReset}>
-                            Tentar Novamente
-                        </button>
-                    </div>
+                        )}
+                    </>
                 )}
             </main>
 

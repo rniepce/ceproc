@@ -267,7 +267,8 @@ Retorne APENAS um JSON válido (sem marcadores de código, sem explicações) co
 
 {{
   "process_name": "Nome do processo",
-  "documentation": "O modelo de processo atual (As Is) descreve ...",
+  "author": "CEPROC",
+  "documentation": "O modelo de processo atual (As Is) descreve [completar com o objetivo do processo, descrevendo o que ele visa assegurar e suas principais etapas]",
   "lanes": [
     {{
       "id": "lane_1",
@@ -291,6 +292,12 @@ Retorne APENAS um JSON válido (sem marcadores de código, sem explicações) co
       "id": "gw_1",
       "type": "exclusiveGateway",
       "name": "Pergunta de decisão?",
+      "lane": "lane_1"
+    }},
+    {{
+      "id": "milestone_1",
+      "type": "intermediateThrowEvent",
+      "name": "Nome do Marco",
       "lane": "lane_1"
     }},
     {{
@@ -319,12 +326,17 @@ Retorne APENAS um JSON válido (sem marcadores de código, sem explicações) co
 REGRAS:
 1. Crie pelo menos 1 lane para cada ator/setor identificado
 2. Use "startEvent" para início, "endEvent" para fim, "task" para atividades, "exclusiveGateway" para decisões
-3. Tarefas: verbos no infinitivo (ex: "Receber petição", "Analisar documento")
-4. Gateways: formulados como perguntas (ex: "Documento está correto?")
+3. Tarefas DEVEM usar verbos no INFINITIVO (ex: "Receber petição", "Analisar documento", "Encaminhar ofício")
+4. Gateways DEVEM ser formulados como PERGUNTAS (ex: "Documento está correto?", "Prazo expirado?")
 5. Os flows devem conectar TODOS os elementos em sequência lógica
 6. Cada gateway deve ter pelo menos 2 saídas (Sim/Não ou equivalente)
 7. IDs devem ser únicos e sem espaços (use underscore)
-8. Retorne APENAS o JSON, nada mais"""
+8. Use "intermediateThrowEvent" para marcar MARCOS importantes do processo (ex: conclusão de uma fase, entrega de documento, mudança de responsabilidade). Inclua pelo menos 1 marco se o processo tiver fases claramente distintas.
+9. O campo "documentation" DEVE começar com "O modelo de processo atual (As Is) descreve" seguido de uma descrição completa do objetivo do processo
+10. O processo DEVE ter exatamente 1 evento de início e pelo menos 1 evento de fim
+11. Todas as lanes DEVEM representar atores ou setores reais identificados no relatório
+12. NÃO usar subprocessos — manter todas as atividades no nível principal
+13. Retorne APENAS o JSON, nada mais"""
 
 
 _STEP2_XML_PROMPT = """Converta o JSON abaixo em código XML BPMN 2.0 válido.
@@ -334,20 +346,26 @@ _STEP2_XML_PROMPT = """Converta o JSON abaixo em código XML BPMN 2.0 válido.
 --- FIM ---
 
 REGRAS OBRIGATÓRIAS:
-1. **Versão**: Use "{version}" como ID.
+1. **Cabeçalho obrigatório**: O elemento <bpmn:process> DEVE conter:
+   - Atributo name com o nome do processo (ex: name="Processamento de sinistro")
+   - Um elemento <bpmn:documentation> como PRIMEIRO filho do <bpmn:process> com o seguinte conteúdo EXATO:
+     Autor: [valor do campo author do JSON] - CEPROC
+     Versão: {version}
+     Descrição: [valor do campo documentation do JSON]
 2. **Estrutura XML**:
    - <bpmn:definitions> como raiz com namespaces corretos
-   - <bpmn:collaboration> com <bpmn:participant> referenciando o processo
+   - <bpmn:collaboration> com <bpmn:participant> referenciando o processo. O <bpmn:participant> DEVE ter atributo name com o nome do processo.
    - <bpmn:process> com <bpmn:laneSet> contendo as lanes
    - Cada lane com <bpmn:flowNodeRef> listando seus elementos
-   - Todos os elementos (startEvent, task, exclusiveGateway, endEvent)
+   - Todos os elementos (startEvent, task, exclusiveGateway, intermediateThrowEvent, endEvent)
    - Todos os sequenceFlow com sourceRef e targetRef corretos
 3. **Namespaces obrigatórios**:
    - xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
    - xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
    - xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
    - xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
-4. **NÃO inclua** <bpmndi:BPMNDiagram> — o layout será calculado automaticamente.
+4. **Marcos (Milestones)**: Elementos do tipo "intermediateThrowEvent" representam marcos do processo. Gere-os como <bpmn:intermediateThrowEvent> no XML.
+5. **NÃO inclua** <bpmndi:BPMNDiagram> — o layout será calculado automaticamente.
 
 OUTPUT: Gere APENAS o XML válido. Comece com <?xml e termine com </bpmn:definitions>."""
 
@@ -456,13 +474,16 @@ Retorne APENAS um JSON válido com esta estrutura:
 
 {{
   "process_name": "Nome do processo otimizado",
-  "documentation": "O modelo de processo proposto (To Be) descreve ...",
+  "author": "CEPROC",
+  "documentation": "O modelo de processo revisado (To Be) descreve [completar com o objetivo do processo otimizado, descrevendo as melhorias incorporadas]",
   "lanes": [
     {{"id": "lane_1", "name": "Nome do Ator/Setor"}}
   ],
   "elements": [
     {{"id": "start_1", "type": "startEvent", "name": "Início", "lane": "lane_1"}},
-    {{"id": "task_1", "type": "task", "name": "Verbo no Infinitivo", "lane": "lane_1"}},
+    {{"id": "task_1", "type": "task", "name": "Verbo no Infinitivo + Complemento", "lane": "lane_1"}},
+    {{"id": "gw_1", "type": "exclusiveGateway", "name": "Pergunta de decisão?", "lane": "lane_1"}},
+    {{"id": "milestone_1", "type": "intermediateThrowEvent", "name": "Nome do Marco", "lane": "lane_1"}},
     {{"id": "end_1", "type": "endEvent", "name": "Fim", "lane": "lane_1"}}
   ],
   "flows": [
@@ -472,10 +493,16 @@ Retorne APENAS um JSON válido com esta estrutura:
 
 REGRAS:
 1. INCORPORE todas as melhorias/propostas aprovadas no novo fluxo
-2. Tarefas: verbos no infinitivo. Gateways: perguntas
-3. IDs únicos, sem espaços
-4. Flows conectando todos os elementos logicamente
-5. Retorne APENAS o JSON"""
+2. Tarefas DEVEM usar verbos no INFINITIVO (ex: "Receber", "Analisar", "Encaminhar")
+3. Gateways DEVEM ser formulados como PERGUNTAS (ex: "Documento correto?", "Prazo expirado?")
+4. IDs únicos, sem espaços (use underscore)
+5. Flows conectando todos os elementos logicamente
+6. Use "intermediateThrowEvent" para marcar MARCOS importantes do processo (conclusão de fases, entregas, mudanças de responsabilidade). Inclua pelo menos 1 marco.
+7. O campo "documentation" DEVE começar com "O modelo de processo revisado (To Be) descreve" seguido de uma descrição do processo otimizado
+8. O processo DEVE ter exatamente 1 evento de início e pelo menos 1 evento de fim
+9. Todas as lanes DEVEM representar atores ou setores reais
+10. NÃO usar subprocessos — manter todas as atividades no nível principal
+11. Retorne APENAS o JSON"""
 
 
 async def modulo_3b_redesenho_to_be(

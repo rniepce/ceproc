@@ -349,6 +349,91 @@ async def download_pdf(request: PdfDownloadRequest):
 
 
 # ═══════════════════════════════════════════════════════════════════
+# BPMN Linter (Validador)
+# ═══════════════════════════════════════════════════════════════════
+@app.post("/api/lint-bpmn")
+async def lint_bpmn_file(file: UploadFile = File(...)):
+    """Upload de .bpmn → Relatório de validação (JSON)."""
+    from bpmn_parser import parse_bpmn
+    from bpmn_linter import lint_bpmn
+
+    ext = Path(file.filename).suffix.lower()
+    if ext not in {".bpmn", ".xml", ".xpdl"}:
+        raise HTTPException(400, f"Formato não suportado: {ext}. Use .bpmn, .xml ou .xpdl")
+
+    try:
+        content = await file.read()
+        xml_content = content.decode("utf-8")
+    except Exception as e:
+        raise HTTPException(400, f"Erro ao ler arquivo: {str(e)}")
+
+    try:
+        model = parse_bpmn(xml_content)
+        report = lint_bpmn(model, filename=file.filename)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(500, f"Erro na validação: {str(e)}")
+
+    return {
+        "success": True,
+        "filename": file.filename,
+        "report": report.to_dict(),
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════
+# DPT Generator (Documento Descritivo do Processo)
+# ═══════════════════════════════════════════════════════════════════
+@app.post("/api/generate-dpt")
+async def generate_dpt_file(file: UploadFile = File(...)):
+    """Upload de .bpmn validado → Download DPT (.docx)."""
+    from bpmn_parser import parse_bpmn
+    from bpmn_linter import lint_bpmn
+    from dpt_generator_docx import generate_dpt
+
+    ext = Path(file.filename).suffix.lower()
+    if ext not in {".bpmn", ".xml", ".xpdl"}:
+        raise HTTPException(400, f"Formato não suportado: {ext}. Use .bpmn, .xml ou .xpdl")
+
+    try:
+        content = await file.read()
+        xml_content = content.decode("utf-8")
+    except Exception as e:
+        raise HTTPException(400, f"Erro ao ler arquivo: {str(e)}")
+
+    try:
+        model = parse_bpmn(xml_content)
+
+        # Run linter — block if critical errors
+        report = lint_bpmn(model, filename=file.filename)
+        if report.has_critical:
+            raise HTTPException(400,
+                f"BPMN contém {report.error_count} erro(s) crítico(s). "
+                "Corrija antes de gerar o DPT."
+            )
+
+        docx_bytes = generate_dpt(model)
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(500, f"Erro ao gerar DPT: {str(e)}")
+
+    process_name = model.process_name or "Processo"
+    safe_name = process_name.replace(" ", "_")[:50]
+
+    return Response(
+        content=docx_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f'attachment; filename="DPT_{safe_name}.docx"'}
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════
 # Serve Built Frontend (Production)
 # ═══════════════════════════════════════════════════════════════════
 STATIC_DIR = Path(__file__).parent / "static"

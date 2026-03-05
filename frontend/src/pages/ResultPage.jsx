@@ -1,7 +1,82 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import BpmnViewer from '../components/BpmnViewer'
 import ChatPanel from '../components/ChatPanel'
+
+/**
+ * Extracts metadata (name, author, version, description) from BPMN XML.
+ * Looks for <bpmn:documentation> inside <bpmn:process> and parses the fields.
+ */
+function extractBpmnMetadata(xml) {
+    if (!xml) return null
+    try {
+        const parser = new DOMParser()
+        const doc = parser.parseFromString(xml, 'text/xml')
+
+        // Try namespaced and non-namespaced selectors
+        const process = doc.querySelector('process') ||
+            doc.getElementsByTagNameNS('http://www.omg.org/spec/BPMN/20100524/MODEL', 'process')[0]
+
+        if (!process) return null
+
+        const name = process.getAttribute('name') || ''
+
+        const documentation = process.querySelector('documentation') ||
+            doc.getElementsByTagNameNS('http://www.omg.org/spec/BPMN/20100524/MODEL', 'documentation')[0]
+
+        const docText = documentation?.textContent || ''
+
+        // Parse structured documentation fields
+        const authorMatch = docText.match(/Autor:\s*(.+)/i)
+        const versionMatch = docText.match(/Vers[ãa]o:\s*(.+)/i)
+        const descMatch = docText.match(/Descri[çc][ãa]o:\s*([\s\S]*)/i)
+
+        return {
+            name: name,
+            author: authorMatch ? authorMatch[1].trim() : '',
+            version: versionMatch ? versionMatch[1].trim() : '',
+            description: descMatch ? descMatch[1].trim() : '',
+        }
+    } catch (e) {
+        console.warn('Failed to parse BPMN metadata:', e)
+        return null
+    }
+}
+
+/**
+ * Displays BPMN header metadata as a styled card.
+ */
+function BpmnMetadataCard({ xml }) {
+    const meta = useMemo(() => extractBpmnMetadata(xml), [xml])
+
+    if (!meta || (!meta.name && !meta.author && !meta.version)) return null
+
+    return (
+        <div className="bpmn-metadata-card">
+            {meta.name && <h3 className="bpmn-metadata-card__title">{meta.name}</h3>}
+            <div className="bpmn-metadata-card__fields">
+                {meta.author && (
+                    <div className="bpmn-metadata-card__field">
+                        <span className="bpmn-metadata-card__label">Autor:</span>
+                        <span className="bpmn-metadata-card__value">{meta.author}</span>
+                    </div>
+                )}
+                {meta.version && (
+                    <div className="bpmn-metadata-card__field">
+                        <span className="bpmn-metadata-card__label">Versão:</span>
+                        <span className="bpmn-metadata-card__value">{meta.version}</span>
+                    </div>
+                )}
+                {meta.description && (
+                    <div className="bpmn-metadata-card__field">
+                        <span className="bpmn-metadata-card__label">Descrição:</span>
+                        <span className="bpmn-metadata-card__value">{meta.description}</span>
+                    </div>
+                )}
+            </div>
+        </div>
+    )
+}
 
 /**
  * ResultPage handles all review states:
@@ -128,6 +203,8 @@ export default function ResultPage({
                     </div>
                 )}
 
+                <BpmnMetadataCard xml={data.bpmn_xml_as_is} />
+
                 <div className="tab-content">
                     <BpmnViewer xml={data.bpmn_xml_as_is} />
                 </div>
@@ -221,6 +298,8 @@ export default function ResultPage({
                     </div>
                 )}
 
+                <BpmnMetadataCard xml={data.bpmn_xml_to_be} />
+
                 <div className="tab-content">
                     <BpmnViewer xml={data.bpmn_xml_to_be} />
                 </div>
@@ -308,8 +387,18 @@ export default function ResultPage({
                 </div>
 
                 <div className="tab-content">
-                    {activeTab === 'bpmn_to_be' && <BpmnViewer xml={data.bpmn_xml_to_be} />}
-                    {activeTab === 'bpmn_as_is' && <BpmnViewer xml={data.bpmn_xml_as_is} />}
+                    {activeTab === 'bpmn_to_be' && (
+                        <>
+                            <BpmnMetadataCard xml={data.bpmn_xml_to_be} />
+                            <BpmnViewer xml={data.bpmn_xml_to_be} />
+                        </>
+                    )}
+                    {activeTab === 'bpmn_as_is' && (
+                        <>
+                            <BpmnMetadataCard xml={data.bpmn_xml_as_is} />
+                            <BpmnViewer xml={data.bpmn_xml_as_is} />
+                        </>
+                    )}
                     {activeTab === 'relatorio' && (
                         <div className="tab-content__body">
                             <div className="tab-content__text markdown-body"><ReactMarkdown>{data.relatorio_descoberta}</ReactMarkdown></div>
