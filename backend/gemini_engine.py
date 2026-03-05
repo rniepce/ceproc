@@ -439,13 +439,6 @@ Sugira melhorias concretas, como:
 
 Para cada sugestão, explique o benefício esperado.
 
-## 3. KPIs Propostos (Metas do CNJ)
-Sugira 3 KPIs (Indicadores-Chave de Desempenho) alinhados às Metas do CNJ, indicando:
-- Nome do KPI
-- Fórmula de cálculo
-- Meta sugerida
-- Frequência de medição
-
 Numere cada proposta de melhoria para que o usuário possa selecionar quais aprovar.
 Apresente de forma clara e profissional em Markdown."""
 
@@ -595,9 +588,6 @@ Para cada etapa, use o formato:
 
 ## 5. Pontos de Atenção
 [Alertas sobre erros comuns, cuidados especiais, prazos]
-
-## 6. Indicadores
-[KPIs validados no módulo anterior, com nome, fórmula e meta]
 
 ---
 *Documento gerado pelo Mapeador Inteligente — CEPROC/TJMG*

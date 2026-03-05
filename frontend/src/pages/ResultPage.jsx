@@ -242,7 +242,7 @@ export default function ResultPage({
                 <ModuleHeader
                     number={3}
                     title="Consultoria e Redesenho TO-BE"
-                    subtitle="Fase A — Gargalos, Inovações e KPIs"
+                    subtitle="Fase A — Gargalos e Inovações"
                 />
 
                 <div className="tab-content">

@@ -11,7 +11,7 @@ const STEPS = [
     },
     {
         title: 'Módulo 3 — Consultoria e Redesenho TO-BE',
-        desc: 'Análise Lean, inovações, KPIs e geração do novo fluxo',
+        desc: 'Análise Lean, inovações e geração do novo fluxo',
     },
     {
         title: 'Módulo 4 — Geração do POP',

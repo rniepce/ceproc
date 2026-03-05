@@ -246,7 +246,7 @@ class Modulo3aRequest(BaseModel):
 
 @app.post("/api/modulo3a")
 async def run_modulo_3a(request: Modulo3aRequest):
-    """Consultoria Lean → Gargalos, inovações e KPIs."""
+    """Consultoria Lean → Gargalos e inovações."""
     try:
         consultoria = await modulo_3a_consultoria(
             request.relatorio_descoberta,
