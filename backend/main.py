@@ -8,6 +8,7 @@ Fluxo interativo: o usuário aprova cada módulo antes de avançar.
 import os
 import tempfile
 import traceback
+import uuid
 from pathlib import Path
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
@@ -481,6 +482,70 @@ async def generate_kpi_file(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f'attachment; filename="IND_{safe_name}.xlsx"'}
     )
+
+
+# ═══════════════════════════════════════════════════════════════════
+# SEI Integration (Upload de Documentos Críticos)
+# ═══════════════════════════════════════════════════════════════════
+
+# Dedicated directory for SEI uploads, separate from the system-wide temp directory
+# to limit exposure of sensitive documents to other system users.
+SEI_UPLOAD_DIR = Path(tempfile.gettempdir()) / "ceproc_sei_uploads"
+
+SEI_ALLOWED_EXTENSIONS = {
+    ".pdf", ".docx", ".doc", ".odt",
+    ".bpmn", ".xml",
+    ".xlsx", ".xls", ".ods",
+    ".txt",
+}
+
+
+@app.post("/api/sei/upload")
+async def sei_upload_document(file: UploadFile = File(...)):
+    """Upload de documento crítico para integração com o SEI.
+
+    Recebe um arquivo (PDF, DOCX, BPMN, etc.), valida a extensão e
+    armazena temporariamente para posterior envio ao SEI.
+
+    Returns:
+        JSON com metadados do arquivo armazenado (nome, tamanho, id de upload).
+    """
+    ext = Path(file.filename).suffix.lower()
+    if ext not in SEI_ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            400,
+            f"Formato não suportado: '{ext}'. "
+            f"Formatos aceitos: {', '.join(sorted(SEI_ALLOWED_EXTENSIONS))}",
+        )
+
+    try:
+        content = await file.read()
+    except Exception as e:
+        raise HTTPException(500, f"Erro ao ler arquivo: {str(e)}")
+
+    if not content:
+        raise HTTPException(400, "Arquivo vazio.")
+
+    # Ensure upload directory exists with restricted permissions (owner-only)
+    SEI_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    SEI_UPLOAD_DIR.chmod(0o700)
+
+    # Use a secure random UUID as the stored filename to avoid leaking internal paths
+    upload_id = str(uuid.uuid4())
+    stored_path = SEI_UPLOAD_DIR / f"{upload_id}{ext}"
+
+    try:
+        stored_path.write_bytes(content)
+    except Exception as e:
+        raise HTTPException(500, f"Erro ao armazenar arquivo: {str(e)}")
+
+    return {
+        "success": True,
+        "upload_id": upload_id,
+        "original_filename": file.filename,
+        "size_bytes": len(content),
+        "message": f"Documento '{file.filename}' recebido com sucesso e aguardando envio ao SEI.",
+    }
 
 
 # ═══════════════════════════════════════════════════════════════════

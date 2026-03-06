@@ -352,6 +352,8 @@ REGRAS OBRIGATÓRIAS:
      Autor: [valor do campo author do JSON] - CEPROC
      Versão: {version}
      Descrição: [valor do campo documentation do JSON]
+   - A Versão DEVE estar no formato YYYYMMDD-01 conforme padrão COGEPRO (ex: 20251117-01).
+     NÃO altere o valor da versão fornecido acima.
 2. **Estrutura XML**:
    - <bpmn:definitions> como raiz com namespaces corretos
    - <bpmn:collaboration> com <bpmn:participant> referenciando o processo. O <bpmn:participant> DEVE ter atributo name com o nome do processo.
