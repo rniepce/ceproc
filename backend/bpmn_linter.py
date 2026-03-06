@@ -212,6 +212,15 @@ TASK_BLACKLIST = ["enviar", "encaminhar", "receber"]
 # Common Portuguese infinitive endings
 INFINITIVE_ENDINGS = ("ar", "er", "ir", "or")
 
+# Common Portuguese nominalization suffixes — words ending in these are likely nouns,
+# not infinitive verbs. Used to detect patterns like "Emissão de documento" (wrong)
+# instead of "Emitir documento" (correct).
+NOMINALIZATION_SUFFIXES = (
+    "ção", "são", "ão", "mento", "imento", "amento",
+    "dade", "tude", "eza", "ura", "agem", "ência", "ância",
+    "ismo", "ista", "gem",
+)
+
 # Common sector/department abbreviations (ALL CAPS expected)
 KNOWN_SECTORS = {
     "CEPROC", "COGEPRO", "TJMG", "SEPLAG", "CGERAIS", "DIRFOR",
@@ -505,13 +514,30 @@ def _lint_tasks(model: BpmnModel, report: LintReport):
 
         # Infinitive check
         if not _is_infinitive(first_word):
-            report.add(LintResult(
-                level="ERROR",
-                rule_id="TASK_INFINITIVE",
-                message=f"Tarefa '{name}' deve iniciar com verbo no infinitivo (ex: Analisar, Elaborar, Verificar).",
-                element_id=elem_id,
-                element_name=name,
-            ))
+            # Check for nominalization pattern (noun used instead of verb)
+            w_lower = first_word.lower()
+            is_nominalization = any(w_lower.endswith(sfx) for sfx in NOMINALIZATION_SUFFIXES)
+            if is_nominalization:
+                report.add(LintResult(
+                    level="ERROR",
+                    rule_id="TASK_INFINITIVE",
+                    message=(
+                        f"Tarefa '{name}' usa substantivo/nominalização '{first_word}'. "
+                        f"Use o verbo no infinitivo correspondente "
+                        f"(ex: 'Emissão de documento' → 'Emitir documento', "
+                        f"'Encaminhamento de ofício' → 'Encaminhar ofício')."
+                    ),
+                    element_id=elem_id,
+                    element_name=name,
+                ))
+            else:
+                report.add(LintResult(
+                    level="ERROR",
+                    rule_id="TASK_INFINITIVE",
+                    message=f"Tarefa '{name}' deve iniciar com verbo no infinitivo (ex: Analisar, Elaborar, Verificar).",
+                    element_id=elem_id,
+                    element_name=name,
+                ))
 
 
 def _lint_gateways(model: BpmnModel, report: LintReport):
@@ -535,12 +561,12 @@ def _lint_gateways(model: BpmnModel, report: LintReport):
                 element_name=name,
             ))
 
-        # Check if it's a question (should contain ?)
-        if "?" not in name:
+        # Check if it's a question ending with ? (must end with ?, not just contain it)
+        if not name.strip().endswith("?"):
             report.add(LintResult(
-                level="WARN",
+                level="ERROR",
                 rule_id="GATEWAY_FORMAT",
-                message=f"Gateway '{name}' deveria ser formulado como pergunta (com '?').",
+                message=f"Gateway '{name}' deve ser formulado como pergunta terminando com '?' (ex: 'Documento correto?', 'Prazo expirado?').",
                 element_id=elem_id,
                 element_name=name,
             ))
