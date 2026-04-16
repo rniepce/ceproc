@@ -248,86 +248,658 @@ async def modulo_1_from_text(transcricao: str) -> str:
 # MÓDULO 2: CONVERSOR BPMN-XML PARA BIZAGI (AS-IS) — CHAIN-OF-THOUGHT
 # ═══════════════════════════════════════════════════════════════════
 
-_STEP1_STRUCTURE_PROMPT = """Com base no Relatório de Descoberta abaixo, extraia a ESTRUTURA do processo AS-IS em formato JSON.
+_STEP1_STRUCTURE_PROMPT = """# 🔄 Prompt Especialista: DPT JSON → BPMN JSON
 
---- RELATÓRIO DE DESCOBERTA ---
-{relatorio}
---- FIM ---
+Converte um JSON de DPT (Descrição do Processo de Trabalho) em um **JSON otimizado para BPMN** com coordenadas, waypoints e sequência de fluxo bem definida.
 
-Retorne APENAS um JSON válido (sem marcadores de código, sem explicações) com esta estrutura:
+---
 
-{{
-  "process_name": "Nome do processo",
-  "author": "CEPROC",
-  "documentation": "O modelo de processo atual (As Is) descreve [completar com o objetivo do processo, descrevendo o que ele visa assegurar e suas principais etapas]",
+## 🎯 Objetivo
+
+Gerar um JSON especializado que será usado pelo gerador BPMN para criar diagramas com:
+- Coordenadas corretas (início/fim nas bordas dos elementos)
+- Waypoints para setas (passando corretamente entre raias)
+- Transições inter-raias identificadas
+- Sincronizações claras
+- Sequência de fluxo bem estruturada
+
+---
+
+## 📋 PROMPT PARA COPIAR E COLAR
+
+
+Você é um especialista em BPMN 2.0 e modelagem de processos.
+
+Sua tarefa é analisar um JSON de DPT (Descrição do Processo de Trabalho) 
+e convertê-lo em um JSON otimizado para geração de diagramas BPMN com 
+coordenadas precisas, waypoints corretos e fluxo entre raias bem estruturado.
+
+REGRAS IMPORTANTES:
+
+1. ESTRUTURA DE RAIAS (LANES)
+   - Identifique todos os atores/responsáveis
+   - Ordene de cima para baixo em ordem lógica
+   - Calcule posição Y para cada raia: Y = 50 + (índice * 200)
+   - Altura da raia: 200px
+   - Raias começam em X=50, width=2000px
+
+2. COORDENADAS DOS ELEMENTOS
+   - Evento Início: X=100, Y=(raia_center), width=40, height=40
+   - Atividades: width=120, height=80
+   - Gateway: width=50, height=50
+   - Evento Fim: width=40, height=40
+   - Espaçamento horizontal entre elementos: 280px
+   - Centro Y de cada raia: raia_Y + 100
+
+3. FLUXO DE SEQUÊNCIA
+   - Mapeia sequência exata: evento_inicio → atividade1 → atividade2 → ... → evento_fim
+   - Se houver decisão (gateway): identifique os fluxos "Sim" e "Não"
+   - Se houver ramificações paralelas: documente claramente
+   - Se houver transição entre raias: marque como "inter_lane_transition": true
+
+4. WAYPOINTS PARA SETAS
+   - Waypoint inicial: borda direita do elemento de origem
+     origem_x + origem_width/2, origem_y
+   - Waypoint final: borda esquerda do elemento de destino
+     destino_x - destino_width/2, destino_y
+   - Se passar por outra raia: adicione waypoints intermediários
+     Exemplo: seta sai de raia 1, passa por raia 2, entra em raia 3
+     Waypoints: [(start_x, start_y), (intermediário_x, raia2_center), (end_x, end_y)]
+
+5. SINCRONIZAÇÕES
+   - Se duas atividades precisam sincronizar: marque com "synchronization_point": true
+   - Indique qual atividade aguarda qual: "waits_for": "activity_id"
+
+6. RESPONSÁVEIS
+   - Cada atividade DEVE ter um responsável explícito
+   - Se não houver no JSON: use "Responsável não identificado"
+   - Mapeia automaticamente para a raia correta
+
+7. GATEWAYS E DECISÕES (REGRA CRÍTICA)
+
+   - TODA condição DEVE ser convertida em uma PERGUNTA explícita
+     Exemplo:
+       "há validação" → "A validação foi realizada?"
+       "verificar documento" → "O documento está válido?"
+
+   - O nome do gateway DEVE sempre terminar com "?"
+   - Nunca use frases descritivas, apenas perguntas claras e objetivas
+
+   - TODO gateway DEVE obrigatoriamente ter EXATAMENTE 2 saídas:
+       1. "Sim"
+       2. "Não"
+
+   - PADRÃO VISUAL DAS SETAS:
+       - "Sim" → sai pela BORDA DIREITA do gateway
+       - "Não" → sai pela BORDA ESQUERDA do gateway
+
+   - POSICIONAMENTO DAS SETAS:
+       - Ambas devem sair CENTRALIZADAS verticalmente no gateway
+       - Coordenada Y = centro do gateway (gateway_y)
+
+   - WAYPOINTS OBRIGATÓRIOS:
+       Para "Sim":
+         ponto inicial = (gateway_x + width/2, gateway_center_y)
+
+       Para "Não":
+         ponto inicial = (gateway_x - width/2, gateway_center_y)
+
+   - FLUXO PADRÃO (default_flow):
+       - Sempre deve ser "Sim", exceto quando explicitamente indicado
+
+   - É PROIBIDO:
+       - Gateway com apenas uma saída
+       - Gateway com mais de duas saídas
+       - Labels diferentes de "Sim" e "Não"
+       - Setas saindo por cima ou por baixo do gateway
+
+   - ESTRUTURA OBRIGATÓRIA:
+     "outgoing": [
+       {
+         "id": "flow_sim",
+         "label": "Sim",
+         "target": "activity_X"
+       },
+       {
+         "id": "flow_nao",
+         "label": "Não",
+         "target": "activity_Y"
+       }
+     ]
+      REGRA ESPECIAL PARA GATEWAYS:
+   - Nunca conecte diretamente atividade → atividade passando "por dentro" do gateway
+   - Sempre:
+       origem → gateway → destino
+
+   - Para saída "Sim" (direita):
+       [
+         (gateway_right_x, center_y),
+         (gateway_right_x + 80, center_y),
+         (... até destino)
+       ]
+
+   - Para saída "Não" (esquerda):
+       [
+         (gateway_left_x, center_y),
+         (gateway_left_x - 80, center_y),
+         (... até destino)
+       ]
+
+8. OBJETOS DE DADOS E DOCUMENTOS
+   - Inclua documentos mencionados
+   - Posicione perto das atividades que os usam
+   - Tipo: "dataObject" ou "dataStore"
+
+9. MARCOS (MILESTONES)
+   - Indique marcos importantes do processo
+   - Não a cada 3 atividades: apenas marcos realmente significativos
+   - Exemplo: "Sinistro documentado", "Responsável identificado"
+
+FORMATO DO JSON DE SAÍDA:
+
+json
+{
+  "metadata": {
+    "processo": "string",
+    "versao": "YYYYMMDD-01",
+    "descricao": "string",
+    "autor": "string",
+    "unidade": "string"
+  },
+
   "lanes": [
-    {{
-      "id": "lane_1",
-      "name": "Nome do Ator/Setor"
-    }}
+    {
+      "id": "lane_0",
+      "nome": "string (nome do ator)",
+      "index": 0,
+      "y": 50,
+      "x": 50,
+      "width": 2000,
+      "height": 200,
+      "center_y": 150
+    }
   ],
-  "elements": [
-    {{
-      "id": "start_1",
-      "type": "startEvent",
-      "name": "Início",
-      "lane": "lane_1"
-    }},
-    {{
-      "id": "task_1",
-      "type": "task",
-      "name": "Verbo no Infinitivo + Complemento",
-      "lane": "lane_1"
-    }},
-    {{
-      "id": "gw_1",
-      "type": "exclusiveGateway",
-      "name": "Pergunta de decisão?",
-      "lane": "lane_1"
-    }},
-    {{
-      "id": "milestone_1",
-      "type": "intermediateThrowEvent",
-      "name": "Nome do Marco",
-      "lane": "lane_1"
-    }},
-    {{
-      "id": "end_1",
-      "type": "endEvent",
-      "name": "Fim",
-      "lane": "lane_1"
-    }}
-  ],
-  "flows": [
-    {{
-      "id": "flow_1",
-      "from": "start_1",
-      "to": "task_1",
-      "label": ""
-    }},
-    {{
-      "id": "flow_2",
-      "from": "gw_1",
-      "to": "task_2",
-      "label": "Sim"
-    }}
-  ]
-}}
 
-REGRAS:
-1. Crie pelo menos 1 lane para cada ator/setor identificado
-2. Use "startEvent" para início, "endEvent" para fim, "task" para atividades, "exclusiveGateway" para decisões
-3. Tarefas DEVEM usar verbos no INFINITIVO (ex: "Receber petição", "Analisar documento", "Encaminhar ofício")
-4. Gateways DEVEM ser formulados como PERGUNTAS (ex: "Documento está correto?", "Prazo expirado?")
-5. Os flows devem conectar TODOS os elementos em sequência lógica
-6. Cada gateway deve ter pelo menos 2 saídas (Sim/Não ou equivalente)
-7. IDs devem ser únicos e sem espaços (use underscore)
-8. Use "intermediateThrowEvent" para marcar MARCOS importantes do processo (ex: conclusão de uma fase, entrega de documento, mudança de responsabilidade). Inclua pelo menos 1 marco se o processo tiver fases claramente distintas.
-9. O campo "documentation" DEVE começar com "O modelo de processo atual (As Is) descreve" seguido de uma descrição completa do objetivo do processo
-10. O processo DEVE ter exatamente 1 evento de início e pelo menos 1 evento de fim
-11. Todas as lanes DEVEM representar atores ou setores reais identificados no relatório
-12. NÃO usar subprocessos — manter todas as atividades no nível principal
-13. Retorne APENAS o JSON, nada mais"""
+  "events": [
+    {
+      "id": "event_start",
+      "nome": "Processo iniciado",
+      "tipo": "start",
+      "lane_id": "lane_0",
+      "x": 100,
+      "y": 150,
+      "width": 40,
+      "height": 40,
+      "outgoing": ["flow_0"]
+    }
+  ],
+
+  "activities": [
+    {
+      "id": "activity_0",
+      "nome": "string (verbo infinitivo)",
+      "tipo": "manual|user|service|send|receive|script",
+      "responsavel": "string",
+      "lane_id": "lane_X",
+      "x": 280,
+      "y": 150,
+      "width": 120,
+      "height": 80,
+      "incoming": ["flow_0"],
+      "outgoing": ["flow_1"],
+      "documentos": ["doc1", "doc2"],
+      "descricao": "string"
+    }
+  ],
+
+  "gateways": [
+    {
+      "id": "gateway_0",
+      "nome": "Pergunta ou condição?",
+      "tipo": "exclusive",
+      "lane_id": "lane_X",
+      "x": 640,
+      "y": 150,
+      "width": 50,
+      "height": 50,
+      "incoming": ["flow_1"],
+      "outgoing": [
+        {
+          "id": "flow_sim",
+          "label": "Sim",
+          "target": "activity_2"
+        },
+        {
+          "id": "flow_nao",
+          "label": "Não",
+          "target": "activity_3"
+        }
+      ],
+      "default_flow": "flow_sim"
+    }
+  ],
+
+  "sequence_flows": [
+    {
+      "id": "flow_0",
+      "source": "event_start",
+      "target": "activity_0",
+      "label": "",
+      "waypoints": [
+        { "x": 140, "y": 150 },
+        { "x": 220, "y": 150 }
+      ],
+      "inter_lane_transition": false,
+      "passes_through_lanes": []
+    },
+    {
+      "id": "flow_inter_lanes",
+      "source": "activity_0",
+      "target": "activity_1",
+      "label": "",
+      "waypoints": [
+        { "x": 400, "y": 150 },
+        { "x": 520, "y": 150 },
+        { "x": 520, "y": 250 },
+        { "x": 280, "y": 250 }
+      ],
+      "inter_lane_transition": true,
+      "passes_through_lanes": ["lane_0", "lane_1"]
+    }
+  ],
+
+  "data_objects": [
+    {
+      "id": "dataObject_0",
+      "nome": "nome do documento",
+      "tipo": "dataObject",
+      "x": 400,
+      "y": 250,
+      "width": 60,
+      "height": 60
+    }
+  ],
+
+  "milestones": [
+    {
+      "id": "milestone_0",
+      "nome": "Milestone importante",
+      "linked_activity": "activity_X"
+    }
+  ],
+
+  "synchronizations": [
+    {
+      "id": "sync_0",
+      "activity_a": "activity_0",
+      "activity_b": "activity_1",
+      "tipo": "join|fork|both",
+      "descricao": "Descrição da sincronização"
+    }
+  ]
+}
+
+
+ANÁLISE E CONVERSÃO:
+
+1. Leia o JSON de DPT fornecido
+2. Identifique:
+   - Atores (para raias)
+   - Sequência de atividades
+   - Decisões/gateways
+   - Transições entre raias
+   - Documentos/objetos de dados
+   - Marcos importantes
+3. Calcule coordenadas para cada elemento
+4. Defina waypoints para cada fluxo
+5. Marque transições inter-raias
+6. Retorne EXCLUSIVAMENTE o JSON (sem texto antes ou depois)
+
+
+
+---
+
+IMPORTANTE:
+- Retorne APENAS o JSON, válido e bem formatado
+- Sem comentários, sem markdown, sem texto adicional
+- JSON deve começar com { e terminar com }
+- Coordenadas em pixels (valores inteiros)
+- Todas as referências de IDs devem existir (sem IDs órfãos)
+- Waypoints devem refletir a real trajetória das setas
+```
+
+---
+
+
+
+## 📊 Exemplo de Entrada (JSON DPT)
+
+
+{
+  "metadados": {
+    "nome_processo": "Processamento do Sinistro",
+    "nome_unidade": "COTRANS",
+    "elaborado_por": "Isabella Cristina"
+  },
+  "atores": {
+    "lista": ["Motorista", "Setor Sinistros", "Oficina"]
+  },
+  "principais_etapas": [
+    {
+      "ordem": 1,
+      "etapa": "Documentar danos",
+      "responsavel": "Motorista"
+    },
+    {
+      "ordem": 2,
+      "etapa": "Criar processo no SEI",
+      "responsavel": "Setor Sinistros",
+      "condicoes": "Há clareza sobre responsável?"
+    },
+    {
+      "ordem": 3,
+      "etapa": "Analisar danos",
+      "responsavel": "Oficina"
+    }
+  ],
+  "documentos_e_indicadores": {
+    "documentos": {
+      "lista": ["Boletim de Ocorrência", "Fotos", "Recibo"]
+    }
+  }
+}
+
+
+---
+
+## 📊 Exemplo de Saída (JSON BPMN Otimizado)
+
+json
+{
+  "metadata": {
+    "processo": "Processamento do Sinistro",
+    "versao": "20251117-01",
+    "descricao": "O modelo de processo atual (As Is) descreve...",
+    "autor": "Isabella Cristina",
+    "unidade": "COTRANS"
+  },
+
+  "lanes": [
+    {
+      "id": "lane_0",
+      "nome": "Motorista",
+      "index": 0,
+      "y": 50,
+      "x": 50,
+      "width": 2000,
+      "height": 200,
+      "center_y": 150
+    },
+    {
+      "id": "lane_1",
+      "nome": "Setor Sinistros",
+      "index": 1,
+      "y": 250,
+      "x": 50,
+      "width": 2000,
+      "height": 200,
+      "center_y": 350
+    },
+    {
+      "id": "lane_2",
+      "nome": "Oficina",
+      "index": 2,
+      "y": 450,
+      "x": 50,
+      "width": 2000,
+      "height": 200,
+      "center_y": 550
+    }
+  ],
+
+  "events": [
+    {
+      "id": "event_start",
+      "nome": "Sinistro reportado",
+      "tipo": "start",
+      "lane_id": "lane_0",
+      "x": 100,
+      "y": 150,
+      "width": 40,
+      "height": 40,
+      "outgoing": ["flow_0"]
+    },
+    {
+      "id": "event_end",
+      "nome": "Sinistro processado",
+      "tipo": "end",
+      "lane_id": "lane_2",
+      "x": 1200,
+      "y": 550,
+      "width": 40,
+      "height": 40,
+      "incoming": ["flow_3"]
+    }
+  ],
+
+  "activities": [
+    {
+      "id": "activity_0",
+      "nome": "Documentar danos",
+      "tipo": "manual",
+      "responsavel": "Motorista",
+      "lane_id": "lane_0",
+      "x": 280,
+      "y": 110,
+      "width": 120,
+      "height": 80,
+      "incoming": ["flow_0"],
+      "outgoing": ["flow_1"],
+      "documentos": ["Fotos"],
+      "descricao": "Tirar fotos e vídeos dos danos"
+    },
+    {
+      "id": "activity_1",
+      "nome": "Criar processo no SEI",
+      "tipo": "user",
+      "responsavel": "Setor Sinistros",
+      "lane_id": "lane_1",
+      "x": 560,
+      "y": 310,
+      "width": 120,
+      "height": 80,
+      "incoming": ["flow_1"],
+      "outgoing": ["flow_2"],
+      "documentos": ["Boletim de Ocorrência"],
+      "descricao": "Abrir processo de manutenção de veículo"
+    },
+    {
+      "id": "activity_2",
+      "nome": "Analisar danos",
+      "tipo": "service",
+      "responsavel": "Oficina",
+      "lane_id": "lane_2",
+      "x": 840,
+      "y": 510,
+      "width": 120,
+      "height": 80,
+      "incoming": ["flow_2"],
+      "outgoing": ["flow_3"],
+      "documentos": ["Fotos", "Recibo"],
+      "descricao": "Avaliar danos e fazer orçamento"
+    }
+  ],
+
+  "gateways": [
+    {
+      "id": "gateway_0",
+      "nome": "Há clareza sobre responsável?",
+      "tipo": "exclusive",
+      "lane_id": "lane_1",
+      "x": 700,
+      "y": 310,
+      "width": 50,
+      "height": 50,
+      "incoming": ["flow_1"],
+      "outgoing": [
+        {
+          "id": "flow_sim",
+          "label": "Sim",
+          "target": "activity_2"
+        },
+        {
+          "id": "flow_nao",
+          "label": "Não",
+          "target": "activity_investigar"
+        }
+      ],
+      "default_flow": "flow_sim"
+    }
+  ],
+
+  "sequence_flows": [
+    {
+      "id": "flow_0",
+      "source": "event_start",
+      "target": "activity_0",
+      "label": "",
+      "waypoints": [
+        { "x": 140, "y": 150 },
+        { "x": 220, "y": 150 }
+      ],
+      "inter_lane_transition": false,
+      "passes_through_lanes": []
+    },
+    {
+      "id": "flow_1",
+      "source": "activity_0",
+      "target": "activity_1",
+      "label": "",
+      "waypoints": [
+        { "x": 400, "y": 150 },
+        { "x": 480, "y": 150 },
+        { "x": 480, "y": 350 },
+        { "x": 560, "y": 350 }
+      ],
+      "inter_lane_transition": true,
+      "passes_through_lanes": ["lane_0", "lane_1"]
+    },
+    {
+      "id": "flow_2",
+      "source": "activity_1",
+      "target": "activity_2",
+      "label": "",
+      "waypoints": [
+        { "x": 680, "y": 350 },
+        { "x": 760, "y": 350 },
+        { "x": 760, "y": 550 },
+        { "x": 840, "y": 550 }
+      ],
+      "inter_lane_transition": true,
+      "passes_through_lanes": ["lane_1", "lane_2"]
+    },
+    {
+      "id": "flow_3",
+      "source": "activity_2",
+      "target": "event_end",
+      "label": "",
+      "waypoints": [
+        { "x": 960, "y": 550 },
+        { "x": 1100, "y": 550 }
+      ],
+      "inter_lane_transition": false,
+      "passes_through_lanes": []
+    }
+  ],
+
+  "data_objects": [
+    {
+      "id": "dataObject_0",
+      "nome": "Boletim de Ocorrência",
+      "tipo": "dataObject",
+      "x": 560,
+      "y": 450,
+      "width": 60,
+      "height": 60
+    },
+    {
+      "id": "dataObject_1",
+      "nome": "Fotos dos Danos",
+      "tipo": "dataObject",
+      "x": 280,
+      "y": 220,
+      "width": 60,
+      "height": 60
+    }
+  ],
+
+  "milestones": [
+    {
+      "id": "milestone_0",
+      "nome": "Danos documentados",
+      "linked_activity": "activity_0"
+    },
+    {
+      "id": "milestone_1",
+      "nome": "Processo criado no SEI",
+      "linked_activity": "activity_1"
+    }
+  ],
+
+  "synchronizations": []
+}
+
+
+---
+
+## 🔍 Detalhes Importantes
+
+### Waypoints
+
+
+Simples (mesma raia):
+  "waypoints": [
+    { "x": 400, "y": 150 },  ← fim do elemento anterior
+    { "x": 480, "y": 150 }   ← início do elemento posterior
+  ]
+
+Inter-raias (passa por raias diferentes):
+  "waypoints": [
+    { "x": 400, "y": 150 },  ← fim de activity_0 (raia_0)
+    { "x": 480, "y": 150 },  ← meio horizontal
+    { "x": 480, "y": 350 },  ← passa pela raia_1 (centro_y=350)
+    { "x": 560, "y": 350 }   ← início de activity_1 (raia_1)
+  ]
+
+Com Gateway:
+  Parte do elemento anterior, passa pelo gateway, 
+  e segue para elemento posterior (sim ou não)
+
+
+### Identificação de Tipos de Tarefas
+
+
+"manual"      ← Padrão, trabalho manual
+"user"        ← Interação com usuário (preencher, clicar)
+"service"     ← Integração com sistema
+"send"        ← Envio de mensagem/documento
+"receive"     ← Recepção de mensagem/documento
+"script"      ← Automação/script
+```
+
+---
+
+## 💡 Dicas
+
+1. **Sempre use este prompt** antes de gerar BPMN
+2. **Verifique os waypoints** - eles definem a trajetória das setas
+3. **Transições inter-raias** precisam de waypoints que passem pelo centro Y das raias intermediárias
+4. **Coordenadas em pixels** - quanto maior X, mais para a direita
+5. **Índice de raia** define a ordem de cima para baixo
+
+---
+
+"""
 
 
 _STEP2_XML_PROMPT = """Converta o JSON abaixo em código XML BPMN 2.0 válido.
