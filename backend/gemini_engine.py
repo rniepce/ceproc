@@ -197,39 +197,137 @@ async def _transcribe_audio(audio_path: str) -> str:
 # ═══════════════════════════════════════════════════════════════════
 # MÓDULO 1: EXTRAÇÃO E DIAGNÓSTICO AS-IS
 # ═══════════════════════════════════════════════════════════════════
-_MODULO_1_PROMPT = """Com base na transcrição da entrevista de mapeamento abaixo, gere o "Relatório de Descoberta" estruturado nos 8 eixos:
+_MODULO_1_PROMPT = """# Prompt: Extração de DPT a partir de Transcrição de Entrevista
 
---- TRANSCRIÇÃO DA ENTREVISTA ---
-{transcricao}
---- FIM DA TRANSCRIÇÃO ---
+---
 
-AÇÃO: Filtre os dados e gere o relatório nos 8 eixos abaixo:
+## PROMPT
 
-## 1. Início do Processo
-Gatilhos (o que dispara o processo), atores envolvidos, insumos necessários e normativos aplicáveis.
+Você é um analista especialista em mapeamento e documentação de processos de trabalho organizacionais.
 
-## 2. Atividades Principais
-Linha do tempo das atividades, atores responsáveis, sistemas utilizados e documentos gerados/consumidos.
+Sua tarefa é analisar a transcrição de uma entrevista com colaboradores de um setor e extrair as informações necessárias para preencher uma **Descrição do Processo de Trabalho (DPT)**, gerando um JSON estruturado com todos os campos obrigatórios para retornar um dpt estruturado sem erro.
 
-## 3. Custo e Produtividade
-Volume de trabalho (quantidade mensal/diária), tempo médio por atividade/processo e tamanho da equipe.
+---
 
-## 4. Restrições e Limitações
-Gargalos identificados, caminhos de exceção e situações problemáticas.
+### INSTRUÇÕES
 
-## 5. Fim do Processo
-Última atividade executada, saídas/produtos finais e cliente final (quem recebe).
+1. Leia atentamente toda a transcrição fornecida.
+2. Identifique e extraia as informações correspondentes a cada campo do DPT listado abaixo.
+3. Se uma informação não estiver explícita na transcrição, mas puder ser inferida com clareza pelo contexto, inclua-a e adicione a observação `"inferido": true` no campo.
+4. Se uma informação realmente não estiver disponível na transcrição, use o valor `null` no campo correspondente.
+5. Use **exclusivamente** um JSON válido, sem texto adicional antes ou depois, seguindo exatamente o schema definido para pensamento.
+6. Retorne o Descrição do Processo de Trabalho (DPT) perfeitamente formatado
 
-## 6. Impacto
-Importância estratégica do processo e riscos da não execução.
+---
 
-## 7. Avaliação
-Indicadores existentes e existência de Procedimentos Operacionais Padrão (POPs).
+### SCHEMA DO JSON
 
-## 8. Expectativa de Melhoria
-Dores da equipe e sugestões de melhoria relatadas pelos servidores.
+```json
+{
+  "metadados": {
+    "nome_processo": "string — nome completo do processo de trabalho descrito",
+    "nome_unidade": "string — nome e sigla da unidade responsável",
+    "subordinacao_hierarquica": "string — nome e sigla da diretoria ou área superior",
+    "elaborado_por": "string — nome de quem elaborou o documento (se mencionado)",
+    "data_elaboracao": "string — data de elaboração no formato DD/MM/AAAA (se mencionada)",
+    "aprovado_por": "string — nome de quem aprovou (se mencionado)",
+    "data_aprovacao": "string — data de aprovação no formato DD/MM/AAAA (se mencionada)"
+  },
+  "negocio": {
+    "descricao": "string — missão ou atuação principal da unidade; o que o setor faz em termos estratégicos/institucionais",
+    "inferido": false
+  },
+  "finalidade": {
+    "descricao": "string — objetivo específico do processo descrito; para que serve este processo",
+    "inferido": false
+  },
+  "conceitos_e_definicoes": [
+    {
+      "termo": "string — nome do conceito ou termo técnico",
+      "definicao": "string — explicação do termo no contexto do processo",
+      "inferido": false
+    }
+  ],
+  "clientes": {
+    "descricao": "string — quem são os destinatários ou beneficiários do processo (pessoas, setores, órgãos)",
+    "lista": ["string"],
+    "inferido": false
+  },
+  "normas_reguladoras": {
+    "descricao": "string — leis, portarias, resoluções ou normativas que regem o processo (se houver)",
+    "lista": ["string"],
+    "inferido": false
+  },
+  "descricoes_de_entrada": {
+    "descricao": "string — o que inicia o processo; quais são os insumos, documentos ou eventos que disparam o fluxo",
+    "lista": ["string"],
+    "inferido": false
+  },
+  "principais_etapas": [
+    {
+      "ordem": "number — número sequencial da etapa",
+      "etapa": "string — nome ou título resumido da etapa",
+      "descricao": "string — o que acontece nesta etapa; quem faz, o que faz e como",
+      "responsavel": "string — ator responsável pela execução desta etapa (se identificável)",
+      "sistemas_utilizados": ["string — sistemas ou ferramentas usados nesta etapa"],
+      "condicoes": "string — condições, desvios ou ramificações do fluxo nesta etapa (se houver)",
+      "inferido": false
+    }
+  ],
+  "descricoes_de_saida": {
+    "descricao": "string — resultado final do processo; o que é entregue ao cliente ao final do fluxo",
+    "lista": ["string"],
+    "inferido": false
+  },
+  "atores": {
+    "descricao": "string — todos os participantes envolvidos na execução do processo",
+    "lista": ["string — nome do ator ou cargo"]
+  },
+  "sistemas_e_infraestrutura": {
+    "descricao": "string — sistemas, plataformas, ferramentas e infraestrutura utilizados no processo",
+    "lista": ["string — nome do sistema ou ferramenta"]
+  },
+  "expectativa_de_melhoria": {
+    "descricao": "string — melhorias esperadas ou já alcançadas com a documentação ou redesenho do processo",
+    "lista": ["string"],
+    "inferido": false
+  },
+  "documentos_e_indicadores": {
+    "documentos": {
+      "descricao": "string — documentos gerados, consultados ou utilizados no processo",
+      "lista": ["string"]
+    },
+    "indicadores": {
+      "descricao": "string — métricas ou indicadores de desempenho do processo (se houver)",
+      "lista": ["string"]
+    }
+  },
+  "pontos_sensiveis": {
+    "descricao": "string — gargalos, riscos, inconsistências, vulnerabilidades ou oportunidades de melhoria identificados no processo",
+    "lista": ["string"]
+  }
+}
+```
 
-REGRA IMPORTANTE: Se faltar alguma informação para qualquer eixo, preencha com: [⚠️ Informação não coletada]
+---
+
+### REGRAS DE EXTRAÇÃO
+
+- **NEGÓCIO**: Busque descrições sobre a missão, atuação ou responsabilidade geral do setor — não do processo específico, mas da área como um todo.
+- **FINALIDADE**: Busque frases como "o objetivo é", "o processo existe para", "garantir que", "assegurar que".
+- **CONCEITOS E DEFINIÇÕES**: Capture qualquer definição de termo técnico, sigla explicada ou conceito que os entrevistados definirem explicitamente.
+- **CLIENTES**: Identifique quem recebe o produto ou serviço do processo — pode ser um setor interno, órgão externo ou cidadão.
+- **NORMAS REGULADORAS**: Capture referências a leis, portarias, resoluções, instruções normativas ou políticas internas.
+- **DESCRIÇÕES DE ENTRADA**: O que desencadeia o processo? Qual documento, evento ou solicitação dá início ao fluxo?
+- **PRINCIPAIS ETAPAS**: Mapeie cada passo do fluxo de trabalho em ordem. Preserve desvios condicionais ("se X, então Y") como `condicoes`.
+- **DESCRIÇÕES DE SAÍDA**: Qual é o produto final entregue? O que indica que o processo foi concluído?
+- **ATORES**: Todo cargo, pessoa ou entidade que executa ou participa do processo.
+- **SISTEMAS E INFRAESTRUTURA**: Qualquer software, plataforma, sistema institucional, ferramenta de comunicação ou equipamento mencionado.
+- **EXPECTATIVA DE MELHORIA**: Menções a problemas que serão resolvidos, padronizações esperadas ou melhorias já implementadas.
+- **DOCUMENTOS E INDICADORES**: Formulários, planilhas, comprovantes, termos, relatórios e métricas citados.
+- **PONTOS SENSÍVEIS**: Problemas, riscos, inconsistências, gargalos, uso inadequado de ferramentas, ausência de padronização, falhas de controle.
+
+---
 
 Gere o relatório completo em Markdown, de forma clara e profissional."""
 
