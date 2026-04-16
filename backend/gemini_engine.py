@@ -205,7 +205,7 @@ _MODULO_1_PROMPT = """# Prompt: Extração de DPT a partir de Transcrição de E
 
 Você é um analista especialista em mapeamento e documentação de processos de trabalho organizacionais.
 
-Sua tarefa é analisar a transcrição de uma entrevista com colaboradores de um setor e extrair as informações necessárias para preencher uma **Descrição do Processo de Trabalho (DPT)**, gerando um JSON estruturado com todos os campos obrigatórios para retornar um dpt estruturado sem erro.
+Sua tarefa é analisar a transcrição de uma entrevista com colaboradores de um setor e extrair as informações necessárias para preencher uma **Descrição do Processo de Trabalho (DPT)**, pense em um JSON estruturado com todos os campos obrigatórios para retornar um dpt estruturado sem erro.
 
 ---
 
@@ -215,7 +215,7 @@ Sua tarefa é analisar a transcrição de uma entrevista com colaboradores de um
 2. Identifique e extraia as informações correspondentes a cada campo do DPT listado abaixo.
 3. Se uma informação não estiver explícita na transcrição, mas puder ser inferida com clareza pelo contexto, inclua-a e adicione a observação `"inferido": true` no campo.
 4. Se uma informação realmente não estiver disponível na transcrição, use o valor `null` no campo correspondente.
-5. Use **exclusivamente** um JSON válido, sem texto adicional antes ou depois, seguindo exatamente o schema definido para pensamento.
+5. Pense em um JSON válido, sem texto adicional antes ou depois, seguindo exatamente o schema definido para pensamento.
 6. Retorne o Descrição do Processo de Trabalho (DPT) perfeitamente formatado
 
 ---
@@ -328,6 +328,102 @@ Sua tarefa é analisar a transcrição de uma entrevista com colaboradores de um
 - **PONTOS SENSÍVEIS**: Problemas, riscos, inconsistências, gargalos, uso inadequado de ferramentas, ausência de padronização, falhas de controle.
 
 ---
+
+exemplo de retorno:
+**DESCRIÇÃO DO PROCESSO DE TRABALHO
+Governança e Gestão de Ciclo de Vida de Projetos de Inteligência Artificial
+Unidade:Grupo Executivo do Comitê de Inteligência Artificial (GEX-IA)
+
+NEGÓCIO
+Atuar como braço operacional e de governança da estratégia de IA do TJMG, garantindo que os projetos sejam éticos, transparentes, seguros e em conformidade com a Estratégia Nacional do Poder Judiciário, focando em gestão de risco e qualidade.
+FINALIDADE
+Estabelecer um fluxo de controle, conformidade e monitoramento para demandas de IA, desde a triagem inicial até o acompanhamento em produção, visando mitigar riscos de viés, privacidade e segurança.
+CONCEITOS E DEFINIÇÕES
+GEX-IA: Grupo Executivo do Comitê de Inteligência Artificial, responsável pela execução da governança de IA.
+TAP-IA: Termo de Abertura de Projeto de IA, documento que formaliza a especificação da governança e autoriza o início do projeto.
+Deriva de conceito (Concept Drift): Mudança nas propriedades estatísticas dos dados de entrada da IA que afeta a performance do modelo em produção.
+Explicabilidade: Capacidade de compreender e explicar como a IA chegou a uma determinada decisão ou resultado.
+CLIENTES
+Unidades judiciais e administrativas do TJMG que demandam automação e inteligência de dados, além dos usuários finais (servidores, magistrados e cidadãos).
+Unidades Judiciais
+Unidades Administrativas
+Comitê de IA
+Corregedoria
+DPO (Encarregado de Dados)
+Sociedade (via Portal da Transparência)
+NORMAS REGULADORAS
+Normativas nacionais e internas que balizam a ética e o desenvolvimento de IA no Judiciário.
+Resolução 332/2020 do CNJ
+Lei Geral de Proteção de Dados (LGPD)
+Estratégia Nacional do Poder Judiciário
+DESCRIÇÕES DE ENTRADA
+O processo é iniciado por meio de uma solicitação formal via canal oficial.
+Chamado no sistema de governança
+Formulário de Demanda de IA no portal interno
+Demandas diretas do Comitê de IA
+PRINCIPAIS ETAPAS
+Registro e Triagem de Governança
+Recebimento da demanda e análise de viabilidade ética, técnica e jurídica (riscos de viés, privacidade e alinhamento normativo).
+Responsável: Equipe Multidisciplinar (Coordenador, Especialista em Governança, Jurisdado Digital e Cientista de Dados)
+Especificação da Governança e Elaboração do TAP-IA
+Documentação detalhada do tipo de IA, nível de autonomia, plano de testes e métricas de performance.
+Responsável: GEX-IA e Área Demandante
+Gestão Contínua de Desenvolvimento
+Acompanhamento das sprints com exigência de relatórios de auditoria de viés, testes de robustez e logs de decisão.
+Responsável: GEX-IA e Time de Dados
+Monitoramento em Produção
+Monitoramento pós-implantação para detectar desvios de performance, ciclos de validação ética e canal de não conformidade.
+Responsável: GEX-IA
+Registro de Ativos e Transparência
+Manutenção do prontuário do modelo no Registro Central de Ativos de IA e publicação de versão resumida no Portal da Transparência.
+Responsável: GEX-IA
+DESCRIÇÕES DE SAÍDA
+IA em produção
+Prontuário completo no Registro de Ativos
+Parecer de triagem
+Relatórios de monitoramento semestrais
+ATORES
+Profissionais e colegiados que executam ou supervisionam o fluxo de governança.
+Coordenador do GEX-IA
+Especialista em Governança de IA
+Jurisdado Digital
+Cientista de Dados
+Comitê de IA
+Área Demandante
+Comitê de Mudanças Restrito
+DPO (Encarregado de Dados)
+Corregedoria
+SISTEMAS E INFRAESTRUTURA
+Ferramentas de software e portais utilizados para controle e monitoramento.
+Sistema de Governança
+Portal Interno do TJMG
+Painel de Governança (Kanban)
+Registro Central de Ativos de IA
+Portal da Transparência
+Plataformas de IA (LLMs/Modelos Preditivos)
+EXPECTATIVA DE MELHORIA
+Padronização do ciclo de vida de IA
+Criação do Selo GEX-IA de conformidade
+Redução de riscos de viés e violação de privacidade
+Aumento da transparência ativa frente ao cidadão
+DOCUMENTOS E INDICADORES
+Documentos:
+Formulário de Demanda de IA
+Parecer de Triagem
+Termo de Abertura de Projeto (TAP-IA)
+Relatório de Auditoria de Viés
+Logs de Decisão da IA
+Prontuário do Modelo
+Indicadores:
+Métricas de performance (precisão, acurácia)
+Índices de viés e explicabilidade
+Logs de erros e incidentes
+Deriva de conceito (Concept Drift)
+PONTOS SENSÍVEIS
+Equilíbrio entre inovação ágil e controle rigoroso
+Gestão de riscos em IA generativa (uso de LLMs)
+Proteção de dados processuais sensíveis
+Necessidade de monitoramento humano contínuo para evitar erros automatizados**
 
 Gere o relatório completo em Markdown, de forma clara e profissional."""
 
