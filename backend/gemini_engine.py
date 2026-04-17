@@ -251,7 +251,7 @@ async def modulo_1_from_text(transcricao: str) -> str:
 _STEP1_STRUCTURE_PROMPT = """#  Prompt Especialista: DPT JSON → BPMN JSON
 
 --- RELATÓRIO DE DESCOBERTA ---
-{relatorio}
+{relatorio_descoberta}
 --- FIM ---
 
 
