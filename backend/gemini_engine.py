@@ -197,7 +197,7 @@ async def _transcribe_audio(audio_path: str) -> str:
 # ═══════════════════════════════════════════════════════════════════
 # MÓDULO 1: EXTRAÇÃO E DIAGNÓSTICO AS-IS
 # ═══════════════════════════════════════════════════════════════════
-_MODULO_1_PROMPT = f"""Você é um analista especialista em mapeamento e documentação de processos de trabalho organizacionais.
+_MODULO_1_PROMPT = """Você é um analista especialista em mapeamento e documentação de processos de trabalho organizacionais.
 
 Sua tarefa é analisar a transcrição de uma entrevista com colaboradores de um setor e extrair as informações necessárias para preencher uma **Descrição do Processo de Trabalho (DPT)**,
 
@@ -248,7 +248,7 @@ async def modulo_1_from_text(transcricao: str) -> str:
 # MÓDULO 2: CONVERSOR BPMN-XML PARA BIZAGI (AS-IS) — CHAIN-OF-THOUGHT
 # ═══════════════════════════════════════════════════════════════════
 
-_STEP1_STRUCTURE_PROMPT = f"""#  Prompt Especialista: DPT JSON → BPMN JSON
+_STEP1_STRUCTURE_PROMPT = """#  Prompt Especialista: DPT JSON → BPMN JSON
 
 --- RELATÓRIO DE DESCOBERTA ---
 {relatorio}
@@ -572,7 +572,7 @@ IMPORTANTE:
 # 3. Mantido o conteúdo da string exatamente igual
 
 
-_STEP2_XML_PROMPT = f"""Converta o JSON abaixo em código XML BPMN 2.0 válido.
+_STEP2_XML_PROMPT = """Converta o JSON abaixo em código XML BPMN 2.0 válido.
 
 --- ESTRUTURA JSON ---
 {structure_json}
