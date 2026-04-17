@@ -354,16 +354,16 @@ REGRAS IMPORTANTES:
 
    - ESTRUTURA OBRIGATÓRIA:
      "outgoing": [
-       {
+       {{
          "id": "flow_sim",
          "label": "Sim",
          "target": "activity_X"
-       },
-       {
+       }},
+       {{
          "id": "flow_nao",
          "label": "Não",
          "target": "activity_Y"
-       }
+       }}
      ]
       REGRA ESPECIAL PARA GATEWAYS:
    - Nunca conecte diretamente atividade → atividade passando "por dentro" do gateway
@@ -397,17 +397,17 @@ REGRAS IMPORTANTES:
 FORMATO DO JSON DE SAÍDA:
 
 json
-{
-  "metadata": {
+{{
+  "metadata": {{
     "processo": "string",
     "versao": "YYYYMMDD-01",
     "descricao": "string",
     "autor": "string",
     "unidade": "string"
-  },
+  }},
 
   "lanes": [
-    {
+    {{
       "id": "lane_0",
       "nome": "string (nome do ator)",
       "index": 0,
@@ -416,11 +416,11 @@ json
       "width": 2000,
       "height": 200,
       "center_y": 150
-    }
+    }}
   ],
 
   "events": [
-    {
+    {{
       "id": "event_start",
       "nome": "Processo iniciado",
       "tipo": "start",
@@ -430,11 +430,11 @@ json
       "width": 40,
       "height": 40,
       "outgoing": ["flow_0"]
-    }
+    }}
   ],
 
   "activities": [
-    {
+    {{
       "id": "activity_0",
       "nome": "string (verbo infinitivo)",
       "tipo": "manual|user|service|send|receive|script",
@@ -448,11 +448,11 @@ json
       "outgoing": ["flow_1"],
       "documentos": ["doc1", "doc2"],
       "descricao": "string"
-    }
+    }}
   ],
 
   "gateways": [
-    {
+    {{
       "id": "gateway_0",
       "nome": "Pergunta ou condição?",
       "tipo": "exclusive",
@@ -463,52 +463,52 @@ json
       "height": 50,
       "incoming": ["flow_1"],
       "outgoing": [
-        {
+        {{
           "id": "flow_sim",
           "label": "Sim",
           "target": "activity_2"
-        },
-        {
+        }},
+        {{
           "id": "flow_nao",
           "label": "Não",
           "target": "activity_3"
-        }
+        }}
       ],
       "default_flow": "flow_sim"
-    }
+    }}
   ],
 
   "sequence_flows": [
-    {
+    {{
       "id": "flow_0",
       "source": "event_start",
       "target": "activity_0",
       "label": "",
       "waypoints": [
-        { "x": 140, "y": 150 },
-        { "x": 220, "y": 150 }
+        {{ "x": 140, "y": 150 }},
+        {{ "x": 220, "y": 150 }}
       ],
       "inter_lane_transition": false,
       "passes_through_lanes": []
-    },
-    {
+    }},
+    {{
       "id": "flow_inter_lanes",
       "source": "activity_0",
       "target": "activity_1",
       "label": "",
       "waypoints": [
-        { "x": 400, "y": 150 },
-        { "x": 520, "y": 150 },
-        { "x": 520, "y": 250 },
-        { "x": 280, "y": 250 }
+        {{ "x": 400, "y": 150 }},
+        {{ "x": 520, "y": 150 }},
+        {{ "x": 520, "y": 250 }},
+        {{ "x": 280, "y": 250 }}
       ],
       "inter_lane_transition": true,
       "passes_through_lanes": ["lane_0", "lane_1"]
-    }
+    }}
   ],
 
   "data_objects": [
-    {
+    {{
       "id": "dataObject_0",
       "nome": "nome do documento",
       "tipo": "dataObject",
@@ -516,27 +516,27 @@ json
       "y": 250,
       "width": 60,
       "height": 60
-    }
+    }}
   ],
 
   "milestones": [
-    {
+    {{
       "id": "milestone_0",
       "nome": "Milestone importante",
       "linked_activity": "activity_X"
-    }
+    }}
   ],
 
   "synchronizations": [
-    {
+    {{
       "id": "sync_0",
       "activity_a": "activity_0",
       "activity_b": "activity_1",
       "tipo": "join|fork|both",
       "descricao": "Descrição da sincronização"
-    }
+    }}
   ]
-}
+}}
 
 
 ANÁLISE E CONVERSÃO:
@@ -561,7 +561,7 @@ ANÁLISE E CONVERSÃO:
 IMPORTANTE:
 - Retorne APENAS o JSON, válido e bem formatado
 - Sem comentários, sem markdown, sem texto adicional
-- JSON deve começar com { e terminar com }
+- JSON deve começar com chaves
 - Coordenadas em pixels (valores inteiros)
 - Todas as referências de IDs devem existir (sem IDs órfãos)
 - Waypoints devem refletir a real trajetória das setas
