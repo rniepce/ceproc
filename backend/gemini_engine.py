@@ -250,6 +250,10 @@ async def modulo_1_from_text(transcricao: str) -> str:
 
 _STEP1_STRUCTURE_PROMPT = """#  Prompt Especialista: DPT JSON → BPMN JSON
 
+--- RELATÓRIO DE DESCOBERTA ---
+{relatorio}
+--- FIM ---
+
 
 
 Gerar um JSON especializado que será usado pelo gerador BPMN para criar diagramas com:
