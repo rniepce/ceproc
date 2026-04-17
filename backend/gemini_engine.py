@@ -248,13 +248,9 @@ async def modulo_1_from_text(transcricao: str) -> str:
 # MÓDULO 2: CONVERSOR BPMN-XML PARA BIZAGI (AS-IS) — CHAIN-OF-THOUGHT
 # ═══════════════════════════════════════════════════════════════════
 
-_STEP1_STRUCTURE_PROMPT = """# 🔄 Prompt Especialista: DPT JSON → BPMN JSON
+_STEP1_STRUCTURE_PROMPT = """#  Prompt Especialista: DPT JSON → BPMN JSON
 
-Converte um JSON de DPT (Descrição do Processo de Trabalho) em um **JSON otimizado para BPMN** com coordenadas, waypoints e sequência de fluxo bem definida.
 
----
-
-## 🎯 Objetivo
 
 Gerar um JSON especializado que será usado pelo gerador BPMN para criar diagramas com:
 - Coordenadas corretas (início/fim nas bordas dos elementos)
@@ -263,9 +259,7 @@ Gerar um JSON especializado que será usado pelo gerador BPMN para criar diagram
 - Sincronizações claras
 - Sequência de fluxo bem estruturada
 
----
 
-## 📋 PROMPT PARA COPIAR E COLAR
 
 
 Você é um especialista em BPMN 2.0 e modelagem de processos.
@@ -542,7 +536,7 @@ json
 
 ANÁLISE E CONVERSÃO:
 
-1. Leia o JSON de DPT fornecido
+1. Leia o DPT fornecido
 2. Identifique:
    - Atores (para raias)
    - Sequência de atividades
@@ -572,47 +566,7 @@ IMPORTANTE:
 
 
 
-## 📊 Exemplo de Entrada (JSON DPT)
-
-
-{
-  "metadados": {
-    "nome_processo": "Processamento do Sinistro",
-    "nome_unidade": "COTRANS",
-    "elaborado_por": "Isabella Cristina"
-  },
-  "atores": {
-    "lista": ["Motorista", "Setor Sinistros", "Oficina"]
-  },
-  "principais_etapas": [
-    {
-      "ordem": 1,
-      "etapa": "Documentar danos",
-      "responsavel": "Motorista"
-    },
-    {
-      "ordem": 2,
-      "etapa": "Criar processo no SEI",
-      "responsavel": "Setor Sinistros",
-      "condicoes": "Há clareza sobre responsável?"
-    },
-    {
-      "ordem": 3,
-      "etapa": "Analisar danos",
-      "responsavel": "Oficina"
-    }
-  ],
-  "documentos_e_indicadores": {
-    "documentos": {
-      "lista": ["Boletim de Ocorrência", "Fotos", "Recibo"]
-    }
-  }
-}
-
-
----
-
-## 📊 Exemplo de Saída (JSON BPMN Otimizado)
+##  Exemplo de Saída (JSON BPMN Otimizado)
 
 json
 {
@@ -891,12 +845,11 @@ Com Gateway:
 
 ## 💡 Dicas
 
-1. **Sempre use este prompt** antes de gerar BPMN
+
 2. **Verifique os waypoints** - eles definem a trajetória das setas
 3. **Transições inter-raias** precisam de waypoints que passem pelo centro Y das raias intermediárias
 4. **Coordenadas em pixels** - quanto maior X, mais para a direita
 5. **Índice de raia** define a ordem de cima para baixo
-
 ---
 
 """
