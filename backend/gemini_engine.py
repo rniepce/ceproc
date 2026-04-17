@@ -248,6 +248,7 @@ async def modulo_1_from_text(transcricao: str) -> str:
 # MÓDULO 2: CONVERSOR BPMN-XML PARA BIZAGI (AS-IS) — CHAIN-OF-THOUGHT
 # ═══════════════════════════════════════════════════════════════════
 
+# Adicione esta constante ANTES da função modulo_2_bpmn_as_is
 _STEP1_STRUCTURE_PROMPT = """#  Prompt Especialista: DPT JSON → BPMN JSON
 
 --- RELATÓRIO DE DESCOBERTA ---
